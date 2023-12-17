@@ -42,8 +42,8 @@ class NsfnetTopo(Topo):
 		s12=self.addSwitch('s12',dpid='00:00:00:00:00:00:00:13',protocols="OpenFlow13")
 		s13=self.addSwitch('s13',dpid='00:00:00:00:00:00:00:14',protocols="OpenFlow13")
 		
-		linkOptns1=dict(delay='5ms', bw=100, loss=0, max_queue_size=1000, use_htb=True)
-		linkOptns2=dict(delay='5ms', bw=1000, loss=0, max_queue_size=1000, use_htb=True)
+		linkOptns1=dict(delay='5ms',bw=10, loss=0, max_queue_size=1000, use_htb=True)
+		linkOptns2=dict(delay='5ms',bw=1000, loss=0, max_queue_size=1000, use_htb=True)
 	
 		self.addLink(s0,s1,**linkOptns2)
 		self.addLink(s0,s2,**linkOptns2)
@@ -67,7 +67,7 @@ class NsfnetTopo(Topo):
 		self.addLink(s10,s13,**linkOptns2)
 		self.addLink(s11,s12,**linkOptns2)
 	
-		self.addLink(s0,h0,**linkOptns1)
+		self.addLink(s0,h0,cls=TCLink, **linkOptns1)
 		self.addLink(s1,h1,**linkOptns1)
 		self.addLink(s2,h2,**linkOptns1)
 		self.addLink(s3,h3,**linkOptns1)
