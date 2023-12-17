@@ -1,18 +1,38 @@
+
+
 import requests
 import json
 import time
 import shortestPath
 
-def getDevices():
+def getHosts():
+    cihazlar={}
     url="http://127.0.0.1:8080/wm/device/"
     response=requests.get(url)
     response_json=response.json()
     #print("[INFO]*****Cihazlar*******\n",response_json["devices"])
-    return response_json["devices"]
+    for host in response_json["devices"]:
+        if(len(host["ipv4"])>0):
+           ip=str(host["ipv4"])
+           ip=ip.replace("['","")
+           ip=ip.replace("']","")
+           ipSegments=(ip.split("."))
+           mac=str(host["mac"])
+           mac=mac.replace("['","")
+           mac=mac.replace("']","")
+           cihazlar["h"+ipSegments[3]]=[ip,mac]
+    return cihazlar
 
 def getAllSwitchs():
     url="http://127.0.0.1:8080/wm/core/controller/switches/json"
-    return requests.get(url).json()
+    switches={}
+    for switch in requests.get(url).json():
+        s=switch["switchDPID"].split(":")
+        switches["s"+s[7]]=switch["switchDPID"]
+    # print("********Switchler**********")
+    # print(len(switches))
+    # print(json.dumps(switches,indent=4))
+    return switches
 
 def deleteAllFlows():
     url="http://127.0.0.1:8080/wm/staticentrypusher/clear/all/json"
@@ -24,6 +44,37 @@ def deleteAllFlows():
 
 if __name__ == "__main__":
     deleteAllFlows()
+    switches={}
+    cihazlar={}
+
+    switches=getAllSwitchs()
+    #print(json.dumps(switches,indent=4))
+    
+    cihazlar=getHosts()
+    #print(json.dumps(cihazlar,indent=4))
+
+    #print(cihazlar["h1"][1])
+    
+    #cihazlar
+    #cihazlar=getDevices()
+    # cihaz=cihazlar[10]
+    # ip=str(cihaz["ipv4"])
+    # ip=ip.replace("['","")
+    # ip=ip.replace("']","")
+    # print(ip)
+    # ip1=ip.split(".")
+    # print(ip1[3])
+    # for cihaz in cihazlar:
+    #     if(len(cihaz["ipv4"])>0):
+    #         ip=str(cihaz["ipv4"])
+    #         ip=ip.split(".")
+    #         print(ip[3])
+    #         print(json.dumps(cihaz,indent=4))
+
+    # for cihaz in cihazlar:
+    #     if cihaz["ipv4"]==None:
+    #         print(json.dumps(cihaz,indent=4))
+    #print(json.dumps(getAllSwitchs(),indent=4))
     #tekrar=10
     # while tekrar>0:
     #     time.sleep(10)
