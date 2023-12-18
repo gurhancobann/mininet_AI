@@ -6,6 +6,7 @@ from mininet.topo import Topo
 from mininet.link import TCLink
 from time import sleep
 
+
 class NsfnetTopo(Topo):
 	"""
 	Topology link:
@@ -95,8 +96,14 @@ def startNetwork():
 	net.pingAll()
 	CLI(net)
 	net.stop()
-	
+
+net =Mininet()
 if __name__ == '__main__':
 	setLogLevel('info')
-	startNetwork()		
+	startNetwork()
+
+# #def getHosts():
+# 	#global net
+# 	print(net.host)
+# 	return net.hosts
 		

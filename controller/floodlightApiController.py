@@ -11,6 +11,7 @@ def getHosts():
     response=requests.get(url)
     response_json=response.json()
     #print("[INFO]*****Cihazlar*******\n",response_json["devices"])
+    i=1
     for host in response_json["devices"]:
         if(len(host["ipv4"])>0):
            ip=str(host["ipv4"])
@@ -20,7 +21,8 @@ def getHosts():
            mac=str(host["mac"])
            mac=mac.replace("['","")
            mac=mac.replace("']","")
-           cihazlar["h"+ipSegments[3]]=[ip,mac]
+           cihazlar[i]=["h"+ipSegments[3],ip,mac,host["attachmentPoint"][0]["switch"],host["attachmentPoint"][0]["port"]]
+           i=i+1
     return cihazlar
 
 def getAllSwitchs():
@@ -41,20 +43,29 @@ def deleteAllFlows():
     print("[INFO]*****Silme Sonucu*****\n",response_json)
     return response_json
 
+def getAllLinks():
+    url="http://127.0.0.1:8080/wm/topology/links/json"
+    response=requests.get(url)
+    response_json=response.json()
+    return response_json
 
 if __name__ == "__main__":
     deleteAllFlows()
     switches={}
     cihazlar={}
+    links={}
 
     switches=getAllSwitchs()
-    #print(json.dumps(switches,indent=4))
+    print(json.dumps(switches,indent=4))
     
     cihazlar=getHosts()
-    #print(json.dumps(cihazlar,indent=4))
+    print(json.dumps(cihazlar,indent=4))
 
-    #print(cihazlar["h1"][1])
-    
+    #links
+    # links=getAllLinks()
+    # print(json.dumps(links,indent=4))
+
+
     #cihazlar
     #cihazlar=getDevices()
     # cihaz=cihazlar[10]

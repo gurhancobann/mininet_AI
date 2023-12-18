@@ -1,0 +1,4 @@
+switchler arası latency             http://127.0.0.1:8080/wm/topology/links/json 
+switchlerdeki anlık rx/tx           http://127.0.0.1:8080/wm/statistics/bandwidth/00:00:00:00:00:00:00:01/all/json
+switchlerdeki düşen paketler        http://127.0.0.1:8080/wm/core/switch/all/port/json
+   
