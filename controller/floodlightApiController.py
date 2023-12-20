@@ -55,6 +55,23 @@ def getPath(src_dpid:str, dst_dpid:str, path_num:str):
     response_json=response.json()
     return response_json["results"]
 
+def flowPusher(flow:dict):
+    
+    url="http://127.0.0.1:8080/wm/staticentrypusher/json"
+    post_response=requests.post(url,json=flow)
+    post_response_json=post_response.json()
+    print(post_response_json)
+def clearAllFlow():
+    url="http://127.0.0.1:8080/wm/staticentrypusher/clear/all/json"
+    post_response=requests.post(url)
+    post_response_json=post_response.json()
+    print(post_response_json)
+
+def clearFlow(switch):
+    url="http://127.0.0.1:8080/wm/staticentrypusher/clear/{switch}/json"
+    post_response=requests.post(url)
+    post_response_json=post_response.json()
+    print(post_response_json)
 if __name__ == "__main__":
     deleteAllFlows()
     switches={}
@@ -63,6 +80,20 @@ if __name__ == "__main__":
     paths={}
 
     edges=[]
+#akış düzenleme
+    flow_s13_s6={
+        "switch":"00:00:00:00:00:00:00:13",
+        "name":"flow_s13_s6",
+        "cookie":"0",
+        "priority":"32768",
+        "eth_type":"0x0800",
+        "in_port" : "4",
+        "active":"true",
+        "actions":"output=2"
+    }
+    clearFlow("00:00:00:00:00:00:00:13")
+    #flowPusher(flow_s13_s6)
+
     # switches=getAllSwitchs()
     # print(json.dumps(switches,indent=4))
     
@@ -70,9 +101,8 @@ if __name__ == "__main__":
     # print(json.dumps(cihazlar,indent=4))
 
     #links
-    links=getAllLinks()
-    print(json.dumps(links,indent=4))
-
+    # links=getAllLinks()
+    # print(json.dumps(links,indent=4))
 
     # paths=getPath("00:00:00:00:00:00:00:10","00:00:00:00:00:00:00:02","3")
     # print(json.dumps(links,indent=4))
