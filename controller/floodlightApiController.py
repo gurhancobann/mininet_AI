@@ -49,22 +49,53 @@ def getAllLinks():
     response_json=response.json()
     return response_json
 
+def getPath(src_dpid:str, dst_dpid:str, path_num:str):
+    url="http://127.0.0.1:8080/wm/routing/paths/{src_dpid}/{dst_dpid}/{path_num}/json"
+    response=requests.get(url)
+    response_json=response.json()
+    return response_json["results"]
+
 if __name__ == "__main__":
     deleteAllFlows()
     switches={}
     cihazlar={}
     links={}
+    paths={}
 
-    switches=getAllSwitchs()
-    print(json.dumps(switches,indent=4))
+    edges=[]
+    # switches=getAllSwitchs()
+    # print(json.dumps(switches,indent=4))
     
-    cihazlar=getHosts()
-    print(json.dumps(cihazlar,indent=4))
+    # cihazlar=getHosts()
+    # print(json.dumps(cihazlar,indent=4))
 
     #links
-    # links=getAllLinks()
+    links=getAllLinks()
+    print(json.dumps(links,indent=4))
+
+
+    # paths=getPath("00:00:00:00:00:00:00:10","00:00:00:00:00:00:00:02","3")
     # print(json.dumps(links,indent=4))
 
+    # switchler arası en uygun yol için kenarlar oluşturuluyor
+
+    # for link in links:
+    #     edges.append((str(link["src-switch"]),str(link["dst-switch"]),link["latency"]))
+    #     edges.append((str(link["dst-switch"]),str(link["src-switch"]),link["latency"]))
+    # print("En kısa yol")
+    # for i in range(14):
+    #     if i+1<10:
+    #         ek1="0"+str(i+1)
+    #     else:
+    #         ek1=str(i+1)
+    #     for j in range(14):
+    #         if j+1<10:
+    #             ek2="0"+str(j+1)
+    #         else:
+    #             ek2=str(j+1)
+    #         print(ek1+" -> "+ek2) 
+    #         print(shortestPath.shortestPath(edges,"00:00:00:00:00:00:00:"+ek1,"00:00:00:00:00:00:00:"+ek2))
+            # print(shortestPath.shortestPath(edges,"00:00:00:00:00:00:00:10","00:00:00:00:00:00:00:02"))
 
     #cihazlar
     #cihazlar=getDevices()
@@ -93,7 +124,7 @@ if __name__ == "__main__":
     #     tekrar=tekrar-1
     
     #switch ağırlıklarını bulduktan sonra alttaki şekliyle yapıp gönder en kısa yolu bulmakta.
-    # edges = [
+    # edges2 = [
     #     ("A", "B", 7),
     #     ("A", "D", 5),
     #     ("B", "C", 8),
@@ -106,5 +137,31 @@ if __name__ == "__main__":
     #     ("E", "G", 9),
     #     ("F", "G", 11)
     # ]
+    # print(json.dumps(edges2,indent=4))
+    
 
-    # print(shortestPath.shortestPath(edges,"A","E"))
+    # edges3=[
+    #     ("00:00:00:00:00:00:00:03", "00:00:00:00:00:00:00:06", 8),
+    #     ("00:00:00:00:00:00:00:11","00:00:00:00:00:00:00:14",8),
+    #     ("00:00:00:00:00:00:00:10","00:00:00:00:00:00:00:13",9),
+    #     ("00:00:00:00:00:00:00:08","00:00:00:00:00:00:00:11",13),
+    #     ("00:00:00:00:00:00:00:01","00:00:00:00:00:00:00:03",10),
+    #     ("00:00:00:00:00:00:00:09","00:00:00:00:00:00:00:12",10),
+    #     ("00:00:00:00:00:00:00:05","00:00:00:00:00:00:00:06",10),
+    #     ("00:00:00:00:00:00:00:09","00:00:00:00:00:00:00:10",12),
+    #     ("00:00:00:00:00:00:00:01","00:00:00:00:00:00:00:02",8),
+    #     ("00:00:00:00:00:00:00:02","00:00:00:00:00:00:00:08",9),
+    #     ("00:00:00:00:00:00:00:06","00:00:00:00:00:00:00:14",9),
+    #     ("00:00:00:00:00:00:00:06","00:00:00:00:00:00:00:13",10),
+    #     ("00:00:00:00:00:00:00:04","00:00:00:00:00:00:00:09",9),
+    #     ("00:00:00:00:00:00:00:07","00:00:00:00:00:00:00:08",13),
+    #     ("00:00:00:00:00:00:00:10","00:00:00:00:00:00:00:11",10),
+    #     ("00:00:00:00:00:00:00:01","00:00:00:00:00:00:00:04",9),
+    #     ("00:00:00:00:00:00:00:11","00:00:00:00:00:00:00:12",9),
+    #     ("00:00:00:00:00:00:00:02","00:00:00:00:00:00:00:03",10),
+    #     ("00:00:00:00:00:00:00:04","00:00:00:00:00:00:00:05",12),
+    #     ("00:00:00:00:00:00:00:12","00:00:00:00:00:00:00:13",10),
+    #     ("00:00:00:00:00:00:00:05","00:00:00:00:00:00:00:07",10)
+    # ]
+    # print("En kısa yol 2")
+    # print(shortestPath.shortestPath(edges3,"00:00:00:00:00:00:00:05","00:00:00:00:00:00:00:08"))
