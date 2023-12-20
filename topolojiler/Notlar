@@ -2,3 +2,19 @@ switchler arası latency             http://127.0.0.1:8080/wm/topology/links/jso
 switchlerdeki anlık rx/tx           http://127.0.0.1:8080/wm/statistics/bandwidth/00:00:00:00:00:00:00:01/all/json
 switchlerdeki düşen paketler        http://127.0.0.1:8080/wm/core/switch/all/port/json
    
+   
+forwarding properties dosyasından silindi.
+ilk etapta linkleri bul.
+en kısa yola göre pathleri gir
+ping at
+yeniden yolları oluştur.
+
+
+Algoriitma
+İlk kurulum.
+1- device/all ile cihazları bul. 
+2- switch değeri olanların bağlı olduğu switch'i ve port numarasını al. bu bizim kaynağımız
+3- links/all ile switchler arası bağlantıları keşfet, bağlı olunan portları al switch'ler için latency'e göre maliyet çıkart
+4- 2. Adımda elde ettiğin cihaz switch bilgilerine göre en kısa yolu bul
+5- kaynak switchden hedefe gide portu belirle
+6- Akış kuralını buna göre yaz cihaz giriş portu hedefe gidiş portu

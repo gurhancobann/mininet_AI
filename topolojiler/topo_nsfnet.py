@@ -92,7 +92,7 @@ def startNetwork():
 	net.build()
 	net.start()
 	print("100ms bağlantıların oluşması için bekleniyor")
-	sleep(10)
+	sleep(20)
 	net.pingAll()
 	CLI(net)
 	net.stop()
