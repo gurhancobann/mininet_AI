@@ -12,9 +12,67 @@ yeniden yolları oluştur.
 
 Algoriitma
 İlk kurulum.
-1- device/all ile cihazları bul. 
-2- switch değeri olanların bağlı olduğu switch'i ve port numarasını al. bu bizim kaynağımız
-3- links/all ile switchler arası bağlantıları keşfet, bağlı olunan portları al switch'ler için latency'e göre maliyet çıkart
-4- 2. Adımda elde ettiğin cihaz switch bilgilerine göre en kısa yolu bul
-5- kaynak switchden hedefe gide portu belirle
-6- Akış kuralını buna göre yaz cihaz giriş portu hedefe gidiş portu
+
+1- Mininet topolojiyi çalıştır
+2- pingall ile tüm cihazların ip almasını sağla.
+3- tüm flowları sil
+4- Başlangıç için switchler arasındaki istatistikleri al.
+5- Başlangıç flowlarını oluştur
+6- video akışını başlat
+7- videonun değerlerini al(trafiksiz)
+
+Harici program
+ağın durumunu al
+tüm flowları sil
+yeni flowları oluştur.
+
+8- Trafik oluştur(düşük seviye)
+9- video akışını başlat
+10- video değerlerini al
+
+11- Trafik oluştur(orta seviye)
+12- video akışını başlat
+13- video değerlerini al
+
+14- Trafik oluştur(yüksek seviye)
+15- video akışını başlat
+16- video değerlerini al
+
+17- Trafik oluştur(düşük seviye)
+18- ağın değerlerini al
+19- Ağ akışlarını yenile
+20- video akışını başlat
+21- video değerlerini al
+
+22- Trafik oluştur(düşük seviye)
+23- ağın değerlerini al
+24- Ağ akışlarını yenile
+25- video akışını başlat
+26- video değerlerini al
+
+27- Trafik oluştur(düşük seviye)
+28- ağın değerlerini al
+29- Ağ akışlarını yenile
+30- video akışını başlat
+31- video değerlerini al
+
+topoloji
+serverlar
+10.0.0.1 en yakın
+10.0.0.2 orta
+10.0.0.3 en uzak
+
+topolojiyi yeniden tasarla
+trafiği oluşturacak olanları belirle ve onların arasında akışı sabitle.
+alıcılarını belirle aynı switch üzerinden 3 tane
+
+mininet içinden yayın al diye bir fonksiyon tasarla. 
+bu fonksiyon için 3 server belirle bunlar yayını başlatacak olanlar
+yayın al dediğimiz bilgisayar bu fonksiyonu başlattığında hedefe ulaşmak için 
+takip edeceği yolu belirle
+1- önce sürekli en yakın olan serverdan bilgi alınsın arka arkaya 3(30 saniye aralıklı) yayın başlat
+2- round robin ile yayın başlat durumlarını izle
+3- serverların yük yoğunluğuna göre seç ve yayını başlat
+
+her yayın başlatmada yayının alınacağı yolu belirle
+ve akışı gir.

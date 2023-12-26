@@ -1,11 +1,20 @@
+import sys 
+sys.path.insert(0,"../controller")
 from mininet.cli import CLI
 from mininet.log import setLogLevel, info
 from mininet.net import Mininet
-from mininet.node import RemoteController, OVSKernelSwitch
+from mininet.node import RemoteController, OVSKernelSwitch, Host, CPULimitedHost
 from mininet.topo import Topo
 from mininet.link import TCLink
-from time import sleep
+from time import sleep, perf_counter
 
+import json
+import pingparsing
+import threading
+from threading import Thread
+import floodlightApiController
+import subprocess
+import pandas as pd
 
 class NsfnetTopo(Topo):
 	"""
@@ -43,45 +52,45 @@ class NsfnetTopo(Topo):
 		s13=self.addSwitch('s13',dpid='00:00:00:00:00:00:00:13',protocols="OpenFlow13")
 		s14=self.addSwitch('s14',dpid='00:00:00:00:00:00:00:14',protocols="OpenFlow13")
 		
-		linkOptns1=dict(delay='5ms',bw=10, loss=0, max_queue_size=1000, use_htb=True)
-		linkOptns2=dict(delay='5ms',bw=1000, loss=0, max_queue_size=1000, use_htb=True)
+		linkOptns1=dict(delay='25ms',bw=10, loss=0, max_queue_size=1000, use_htb=True)
+		linkOptns2=dict(delay='25ms',bw=10, loss=0, max_queue_size=1000, use_htb=True)
 	
-		self.addLink(s1,s2,**linkOptns2)
-		self.addLink(s1,s3,**linkOptns2)
-		self.addLink(s1,s4,**linkOptns2)
-		self.addLink(s2,s8,**linkOptns2)
-		self.addLink(s2,s3,**linkOptns2)
-		self.addLink(s3,s6,**linkOptns2)
-		self.addLink(s4,s5,**linkOptns2)
-		self.addLink(s4,s9,**linkOptns2)
-		self.addLink(s5,s6,**linkOptns2)
-		self.addLink(s5,s7,**linkOptns2)
-		self.addLink(s6,s13,**linkOptns2)
-		self.addLink(s6,s14,**linkOptns2)
-		self.addLink(s7,s8,**linkOptns2)
-		self.addLink(s8,s11,**linkOptns2)
-		self.addLink(s9,s10,**linkOptns2)
-		self.addLink(s9,s12,**linkOptns2)
-		self.addLink(s10,s11,**linkOptns2)
-		self.addLink(s10,s13,**linkOptns2)
-		self.addLink(s11,s12,**linkOptns2)
-		self.addLink(s11,s14,**linkOptns2)
-		self.addLink(s12,s13,**linkOptns2)
+		self.addLink(s1, s2, **linkOptns2)
+		self.addLink(s1, s3, **linkOptns2)
+		self.addLink(s1, s4, **linkOptns2)
+		self.addLink(s2, s8, **linkOptns2)
+		self.addLink(s2, s3, **linkOptns2)
+		self.addLink(s3, s6, **linkOptns2)
+		self.addLink(s4, s5, **linkOptns2)
+		self.addLink(s4, s9, **linkOptns2)
+		self.addLink(s5, s6, **linkOptns2)
+		self.addLink(s5, s7, **linkOptns2)
+		self.addLink(s6, s13, **linkOptns2)
+		self.addLink(s6, s14, **linkOptns2)
+		self.addLink(s7, s8, **linkOptns2)
+		self.addLink(s8, s11, **linkOptns2)
+		self.addLink(s9, s10, **linkOptns2)
+		self.addLink(s9, s12, **linkOptns2)
+		self.addLink(s10, s11, **linkOptns2)
+		self.addLink(s10, s13, **linkOptns2)
+		self.addLink(s11, s12, **linkOptns2)
+		self.addLink(s11, s14, **linkOptns2)
+		self.addLink(s12, s13, **linkOptns2)
 	
-		self.addLink(s1,h1,cls=TCLink, **linkOptns1)
-		self.addLink(s2,h2,**linkOptns1)
-		self.addLink(s3,h3,**linkOptns1)
-		self.addLink(s4,h4,**linkOptns1)
-		self.addLink(s5,h5,**linkOptns1)
-		self.addLink(s6,h6,**linkOptns1)
-		self.addLink(s7,h7,**linkOptns1)
-		self.addLink(s8,h8,**linkOptns1)
-		self.addLink(s9,h9,**linkOptns1)
-		self.addLink(s10,h10,**linkOptns1)
-		self.addLink(s11,h11,**linkOptns1)
-		self.addLink(s12,h12,**linkOptns1)
-		self.addLink(s13,h13,**linkOptns1)
-		self.addLink(s14,h14,**linkOptns1)
+		self.addLink(s1, h1, **linkOptns1)
+		self.addLink(s2, h2, **linkOptns1)
+		self.addLink(s3, h3, **linkOptns1)
+		self.addLink(s4, h4, **linkOptns1)
+		self.addLink(s5, h5, **linkOptns1)
+		self.addLink(s6, h6, **linkOptns1)
+		self.addLink(s7, h7, **linkOptns1)
+		self.addLink(s8, h8, **linkOptns1)
+		self.addLink(s9, h9, **linkOptns1)
+		self.addLink(s10, h10, **linkOptns1)
+		self.addLink(s11, h11, **linkOptns1)
+		self.addLink(s12, h12, **linkOptns1)
+		self.addLink(s13, h13, **linkOptns1)
+		self.addLink(s14, h14, **linkOptns1)
 def startNetwork():
 	global net
 	net=Mininet(topo=NsfnetTopo(),link=TCLink, build=False, switch=OVSKernelSwitch, autoSetMacs=True, waitConnected=True)
@@ -92,8 +101,12 @@ def startNetwork():
 	net.build()
 	net.start()
 	print("100ms bağlantıların oluşması için bekleniyor")
-	sleep(20)
-	#net.pingAll()
+	sleep(2)
+	net.pingAll()
+	
+    #Ağın boş durumdaki haliyle bilgileri alınarak standart başlangıç akışları oluşturulacak.
+	
+
 	CLI(net)
 	net.stop()
 
