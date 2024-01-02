@@ -1,5 +1,8 @@
-import sys 
-sys.path.insert(0,"../controller")
+#!usr/bin/python
+
+import sys
+import pingparsing
+sys.path.append("../controller")
 from mininet.cli import CLI
 from mininet.log import setLogLevel, info
 from mininet.net import Mininet
@@ -9,7 +12,8 @@ from mininet.link import TCLink
 from time import sleep, perf_counter
 
 import json
-import pingparsing
+from multiprocessing import Pool
+from concurrent.futures import ThreadPoolExecutor
 import threading
 from threading import Thread
 import floodlightApiController
@@ -93,6 +97,10 @@ class NsfnetTopo(Topo):
 		self.addLink(s14, h14, **linkOptns1)
 def startNetwork():
 	global net
+	global activeThreadList
+	activeThreadList=[]
+	net=None
+
 	net=Mininet(topo=NsfnetTopo(),link=TCLink, build=False, switch=OVSKernelSwitch, autoSetMacs=True, waitConnected=True)
 	remote_ip="127.0.0.1"
 	
@@ -100,21 +108,182 @@ def startNetwork():
 	
 	net.build()
 	net.start()
-	print("100ms bağlantıların oluşması için bekleniyor")
+	print("2s bağlantıların oluşması için bekleniyor")
 	sleep(2)
-	net.pingAll()
+	#net.pingAll()
 	
+	info(f'[INFO]********Video Alınıyor*******\n')
+	#poool
+	# p=Pool(processes=2)
+	# p.map(takeVideo,["h1","h2"])
+	# with ThreadPoolExecutor() as executor:
+	# 	array=["h1","h2","h3"]
+	# 	executor.map(takeVideo1,array)
+
+	wireThread=HostCommand(net.getNodeByName("s4"),"wireshark")
+	wireThread.daemon=True
+	wireThread.start()
+	sendVideo()
+	receiveVideo(["h1","h2","h3"])
+	activeThreadList=threading.enumerate()
+	activeThreadList.pop(0)
+	print(activeThreadList)
+	activeThreadList[len(activeThreadList)-1].join()
+	info(f'[INFO]********Video bitti*******\n')
+	info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
+	wireThread.join()
+	#sleep(660)
+	# for thread in activeThreadList:
+	# 	print(thread)
+	# 	while(thread.is_alive()):
+	# 		print("Thread Waiting...")
+	# 		sleep(3)
+	# 	thread.join()
+	# 	print("thread done")
+	#killFfmegPorts("h9")
     #Ağın boş durumdaki haliyle bilgileri alınarak standart başlangıç akışları oluşturulacak.
 	
 
-	CLI(net)
-	net.stop()
+	#CLI(net)
+	#net.stop()
 
-net =Mininet()
+#net =Mininet()
+def takeVideo1(receiver):
+	print("receivers uzunluğu : "+str(len(receiver)))
+	print(receiver)
+	videoSource="output.ts"
+	port="1234"
+	i=0
+	# senderThread=[]
+	# receiverThread=[]
+	
+	print("receiver: "+receiver)
+	receiverNode,senderNode=net.getNodeByName(receiver), net.getNodeByName("h9")
+	print(receiverNode.IP())
+	receiverURL=f"udp://{receiverNode.IP()}:{port}"
+	receiverNode.cmd(f"mkdir records/{receiver}")
+	senderCommand=f"ffmpeg -re -i {videoSource} -c copy -f mpegts {receiverURL}"
+	#receiverCommand=f"ffplay -i {receiverURL}"
+	receiverCommand=f"ffmpeg -i {receiverURL} -c copy records/{receiver}/input.ts"
+	senderThread=(HostCommand(senderNode, senderCommand))
+	receiverThread=(HostCommand(receiverNode, receiverCommand))
+	senderThread.daemon=True
+	receiverThread.daemon=True
+		
+	receiverThread.start()
+	sleep(1)
+	senderThread.start()
+	# senderThread.join()
+	# sleep(5)
+	# killFfmegPorts(senderNode)
+	# receiverThread.join()
+
+def receiveVideo(receivers):
+	port="1234"
+	#receiverThread
+	for receiver in receivers:
+		print("receiver: "+receiver)
+		receiverNode=net.getNodeByName(receiver)
+		print(receiverNode.IP())
+		receiverURL=f"udp://{receiverNode.IP()}:{port}"
+		receiverNode.cmd(f"mkdir records/{receiver}")
+		#senderCommand=f"ffmpeg -re -i {videoSource} -c copy -f mpegts {receiverURL}"
+		#receiverCommand=f"ffplay -i {receiverURL}"
+		receiverCommand=f"ffmpeg -i {receiverURL} -c copy records/{receiver}/input.ts"
+		#receiverCommand=f"ffmpeg -i {receiverURL}"
+		#senderThread=(HostCommand(senderNode, senderCommand))
+		receiverThread=(HostCommand(receiverNode, receiverCommand))
+		#senderThread.daemon=True
+		receiverThread.daemon=True
+		#threads.append(senderThread)
+		#threads.append(receiverThread)
+		receiverThread.start()
+		#receiverThread.join()
+		#senderThread.start()
+		#sleep(5)
+def sendVideo():
+	videoSource="output.ts"
+	port="1234"
+	senderNode=net.getNodeByName("h9")
+	senderCommand=f"ffmpeg -re -itsoffset -10 -i {videoSource} -c copy -f mpegts udp://10.0.0.1:1234 -c copy -f mpegts udp://10.0.0.2:1234 -c copy -f mpegts udp://10.0.0.3:1234"
+	senderThread=(HostCommand(senderNode, senderCommand))
+	senderThread.daemon=True
+	senderThread.start()
+	print("sender start")
+	##senderThread.join()
+
+def takeVideo(receivers):
+	print("receivers uzunluğu : "+str(len(receivers)))
+	print(receivers)
+	videoSource="output.ts"
+	port="1234"
+	i=0
+	threads=[]
+	# senderThread=[]
+	# receiverThread=[]
+	for receiver in receivers:
+		print("receiver: "+receiver)
+		receiverNode,senderNode=net.getNodeByName(receiver), net.getNodeByName("h9")
+		print(receiverNode.IP())
+		receiverURL=f"udp://{receiverNode.IP()}:{port}"
+		receiverNode.cmd(f"mkdir records/{receiver}")
+		senderCommand=f"ffmpeg -re -i {videoSource} -c copy -f mpegts {receiverURL}"
+		#receiverCommand=f"ffplay -i {receiverURL}"
+		receiverCommand=f"ffmpeg -i {receiverURL} -c copy records/{receiver}/input.ts"
+		senderThread=(HostCommand(senderNode, senderCommand))
+		receiverThread=(HostCommand(receiverNode, receiverCommand))
+		senderThread.daemon=True
+		receiverThread.daemon=True
+		threads.append(senderThread)
+		threads.append(receiverThread)
+		receiverThread.start()
+		sleep(1)
+		senderThread.start()
+	for thread in threads:
+
+		thread.wait()
+		sleep(5)
+		#killFfmegPorts(senderNode)
+		#receiverThread.wait()
+		#print(i)		
+		i=i+1
+def killFfmegPorts(senderNode):
+	#senderNode=net.getNodeByName(senderNodes)
+	commandCheckPort="pgrep -x ffmpeg"
+	commandKillPort="pkill -x ffmpeg"
+	result=senderNode.cmd(commandCheckPort)
+	while(result !=""):
+		senderNode.cmd(commandKillPort)
+		print("port Killed: ",result)
+		result=senderNode.cmd(commandCheckPort)
+
+class HostCommand(Thread):
+	def __init__(self, host:Host, command:str):
+		Thread.__init__(self)
+		self._host=host
+		self._command=command
+		self.result=None
+	def run(self):
+		self.result=self._host.cmd(self._command)
+
+class floodlightThread(Thread):
+	def __init__(self,hn):
+		self.hostname=hn
+		Thread.__init__(self)
+	def run(self):
+		takeVideo(self.hostname)
+def video_al():
+	threads=[]
+	hosts=["h1","h2","h3"]
+
+	for item in hosts:
+		hn=net.getNodeByName(item)
+		thread=floodlightThread(hn)
+		threads.append(thread)
+		thread.start()
 if __name__ == '__main__':
 	setLogLevel('info')
 	startNetwork()
-
 # #def getHosts():
 # 	#global net
 # 	print(net.host)
