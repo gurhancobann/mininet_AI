@@ -102,6 +102,8 @@ def startNetwork():
 	global activeThreadList
 	activeThreadList=[]
 	net=None
+	dataFrame=pd.read_csv('data.csv')
+	dataRow={}
 
 	net=Mininet(topo=NsfnetTopo(),link=TCLink, build=False, switch=OVSKernelSwitch, autoSetMacs=True, waitConnected=True)
 	remote_ip="127.0.0.1"
@@ -124,23 +126,36 @@ def startNetwork():
 	# wireThread=HostCommand(net.getNodeByName("s4"),"wireshark")
 	# wireThread.daemon=True
 	# wireThread.start()
-	info(f'[INFO]*********Test Yayını Başlatıldı********\n')
-	info(f'[INFO]**********Test Yayını Alınıyor*********\n')
-	test(["h1","h2","h3","h4","h5"])
-	killFfmegPorts("h10")
-	killFfmegPorts("h14")
-	info(f'[INFO]********Test Bitti - Aktif thread sayısı : {threading.active_count()}*******\n')
-	info(f'[INFO]********ASıl İşlem *******\n')
-	roundRobin(["h1","h2","h3","h4","h5","h6"])
-
-	activeThreadList=threading.enumerate()
-	activeThreadList.pop(0)
-	print(activeThreadList)
-	#activeThreadList[len(activeThreadList)-1].join()
-	info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
-	killFfmegPorts("h10")
-	killFfmegPorts("h14")
+	# info(f'[INFO]*********Test Yayını Başlatıldı********\n')
+	# info(f'[INFO]**********Test Yayını Alınıyor*********\n')
+	# test(["h1","h2","h3","h4","h5"])
+	# killFfmegPorts("h10")
+	# killFfmegPorts("h14")
+	# info(f'[INFO]********Test Bitti - Aktif thread sayısı : {threading.active_count()}*******\n')
+	# info(f'[INFO]********ASıl İşlem *******\n')
+	# roundRobin(["h1","h2","h3","h4","h5","h6"])
+	# sleep(10)
+	# activeThreadList=threading.enumerate()
+	# activeThreadList.pop(0)
+	# print(activeThreadList)
+	# #activeThreadList[len(activeThreadList)-1].join()
+	# info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
+	# killFfmegPorts("h10")
+	# killFfmegPorts("h14")
+	info(f'[INFO]********PSNR & SSIM Değerleri Hesaplanıyor*******\n')
+	for host in ["h1","h2","h3","h4","h5","h6"]:
+		psnr, ssim_first, ssim_second=calcPsnrSsim(host)
+		dataRow={"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"type":2}
+		dataFrame=dataFrame.append(dataRow,ignore_index=True)
 	
+	dataFrame.to_csv("data.csv",sep=",",index=False,encoding="utf-8")
+	
+	try:
+		deletefile()
+	except Exception as e:
+		print(f"Excaption {e}")
+	
+	cleanMininet()
 	# wireThread.join()
 	
 def test(receivers):
@@ -189,8 +204,6 @@ def roundRobin(receivers):
 	videoSource="output.ts"
 	i=0
 	senderNode1, senderNode2=net.getNodeByName("h10"), net.getNodeByName("h14")
-	num_paths=3
-	path_index=0
 	senderCommand1=f"ffmpeg -re -i {videoSource}"
 	senderCommand2=f"ffmpeg -re -i {videoSource}"
 	for receiver in receivers:
@@ -221,14 +234,45 @@ def roundRobin(receivers):
 	info(f'[INFO]********Video gönderim bitti*******\n')
 
 def killFfmegPorts(senderNode):
-	senderNode=net.getNodeByName(senderNode)
+	node=net.getNodeByName(senderNode)
 	commandCheckPort="pgrep -x ffmpeg"
 	commandKillPort="pkill -x ffmpeg"
-	result=senderNode.cmd(commandCheckPort)
+	result=node.cmd(commandCheckPort)
 	while(result !=""):
-		senderNode.cmd(commandKillPort)
+		node.cmd(commandKillPort)
 		print("port Killed: ",result)
-		result=senderNode.cmd(commandCheckPort)
+		result=node.cmd(commandCheckPort)
+
+def cleanMininet():
+	script_path="cleanMininet.sh"
+	subprocess.run(['bash',script_path])
+
+def deletefile():
+	script_path="deleteFile.sh"
+	subprocess.run(['bash',script_path])
+
+def calcPsnrSsim(receiver):
+	host=net.getNodeByName(receiver)
+	print(f"***********{host} için PSNR ve SSİM değerleri hesaplanıyor******")
+	videoSource="output.ts"
+	outputSource=f"records/{host}/input.ts"
+	command=f"ffmpeg -i {videoSource} -i {outputSource} -lavfi '[0:v][1:v]psnr' -f null -"
+	hostThread=HostCommand(host, command)
+	hostThread.daemon=True
+	hostThread.start()
+	hostThread.join()
+	psnrResault=hostThread.result
+	psnrResault=float(psnrResault.split("\n")[-2].split("average:")[1].split(" ")[0].strip())
+	command=f"ffmpeg -i {videoSource} -i {outputSource} -lavfi '[0:v][1:v]ssim' -f null -"
+	hostThread=HostCommand(host, command)
+	hostThread.daemon=True
+	hostThread.start()
+	hostThread.join()
+	ssimResault=hostThread.result.split("\n")[-2]
+	first=float(ssimResault.split("All:")[1].split(" ")[0])
+	second=float(ssimResault.split("All:")[1].split(" ")[1].replace("(","").replace(")",""))
+	print(f"***********PSNR:{psnrResault}, SSIM F:{first}, SSIM S:{second}******")
+	return psnrResault, first, second
 
 class HostCommand(Thread):
 	def __init__(self, host:Host, command:str):

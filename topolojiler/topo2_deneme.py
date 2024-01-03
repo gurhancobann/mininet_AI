@@ -127,25 +127,25 @@ def startNetwork():
 	# wireThread.daemon=True
 	# wireThread.start()
 	info(f'[INFO]*********Test Yayını Başlatıldı********\n')
-	testVideo()
 	info(f'[INFO]**********Test Yayını Alınıyor*********\n')
-	receiveTest(["h1","h2","h3","h4","h5"])
-	info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
-	info(f'[INFO]********Testin Bitmesi Bekleniyor*******\n')
-	sleep(31)
+	test(["h1","h2","h3","h4","h5"])
+	killFfmegPorts("h10")
+	killFfmegPorts("h14")
 	info(f'[INFO]********Test Bitti - Aktif thread sayısı : {threading.active_count()}*******\n')
 	info(f'[INFO]********ASıl İşlem *******\n')
-	receiveVideo(["h1","h2","h3","h4","h5","h6"])
-	sendVideo()
+	roundRobin(["h1","h2","h3","h4","h5","h6"])
+	sleep(10)
 	activeThreadList=threading.enumerate()
 	activeThreadList.pop(0)
 	print(activeThreadList)
-	activeThreadList[len(activeThreadList)-1].join()
-	info(f'[INFO]********Video bitti*******\n')
+	#activeThreadList[len(activeThreadList)-1].join()
+	info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
+	killFfmegPorts("h10")
+	killFfmegPorts("h14")
 	info(f'[INFO]********PSNR & SSIM Değerleri Hesaplanıyor*******\n')
 	for host in ["h1","h2","h3","h4","h5","h6"]:
 		psnr, ssim_first, ssim_second=calcPsnrSsim(host)
-		dataRow={"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"type":1}
+		dataRow={"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"type":2}
 		dataFrame=dataFrame.append(dataRow,ignore_index=True)
 	
 	dataFrame.to_csv("data.csv",sep=",",index=False,encoding="utf-8")
@@ -156,78 +156,100 @@ def startNetwork():
 		print(f"Excaption {e}")
 	
 	cleanMininet()
-	
-	info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
 	# wireThread.join()
 	
-def receiveTest(receivers):
+def test(receivers):
 	port="1234"
+	videoSource="test.ts"
+	i=0
+	senderNode1, senderNode2=net.getNodeByName("h10"), net.getNodeByName("h14")
+	num_paths=3
+	path_index=0
+	senderCommand1=f"ffmpeg -re -i {videoSource}"
+	senderCommand2=f"ffmpeg -re -i {videoSource}"
 	for receiver in receivers:
-		print("receiver: "+receiver)
-		senderNode, receiverNode=net.getNodeByName("h14"), net.getNodeByName(receiver)
-		src_host_mac=senderNode.MAC()
-		src_host_ipv4=senderNode.IP()
+		
+		receiverNode=net.getNodeByName(receiver)
 		dst_host_mac=receiverNode.MAC()
-		dst_host_ıpv4=receiverNode.IP()
-		num_paths=3
-		path_index=0
-		receiverURL=f"udp://{dst_host_ıpv4}:{port}"
-		#receiverCommand=f"ffplay -i {receiverURL}"
-		#receiverCommand=f"ffmpeg -i {receiverURL} -c copy records/{receiver}/input.ts"
-		floodlightRestApi.pathPusher(src_host_mac, src_host_ipv4, dst_host_mac,dst_host_ıpv4,num_paths,path_index)
+		dst_host_ipv4=receiverNode.IP()
+		if(i%2==0):
+			print("receiver: "+receiver+" - > h14")
+			src_host_mac=senderNode2.MAC()
+			src_host_ipv4=senderNode2.IP()
+			senderCommand2=senderCommand2+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+		else:
+			print("receiver: "+receiver+" - > h10")
+			src_host_mac=senderNode1.MAC()
+			src_host_ipv4=senderNode1.IP()
+			senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+		
+		floodlightRestApi.pathPusher(src_host_mac, src_host_ipv4, dst_host_mac,dst_host_ipv4,num_paths,path_index)
+		receiverURL=f"udp://{dst_host_ipv4}:{port}"
 		receiverCommand=f"ffmpeg -i {receiverURL}"
 		receiverThread=(HostCommand(receiverNode, receiverCommand))
 		receiverThread.daemon=True
 		receiverThread.start()
+		i=i+1
+		sleep(2)
+	senderThread1=(HostCommand(senderNode1, senderCommand1))
+	senderThread1.daemon=True
+	senderThread1.start()
+	senderThread2=(HostCommand(senderNode2, senderCommand2))
+	senderThread2.daemon=True
+	senderThread2.start()
+	senderThread2.join()
 
-def receiveVideo(receivers):
+def roundRobin(receivers):
 	port="1234"
+	videoSource="output.ts"
 	i=0
+	senderNode1, senderNode2=net.getNodeByName("h10"), net.getNodeByName("h14")
+	senderCommand1=f"ffmpeg -re -i {videoSource}"
+	senderCommand2=f"ffmpeg -re -i {videoSource}"
 	for receiver in receivers:
-		receiverNode=net.getNodeByName(receiver)
-		if i==len(receivers)-1:
-			floodlightRestApi.pathPusher(net.getNodeByName("h14").MAC(), net.getNodeByName("h14").IP(), receiverNode.MAC(),receiverNode.IP(),3,0)
 		print("receiver: "+receiver)
-		print(receiverNode.IP())
-		receiverURL=f"udp://{receiverNode.IP()}:{port}"
+		receiverNode=net.getNodeByName(receiver)
+		dst_host_ipv4=receiverNode.IP()
+		if(i%2==0):
+			senderCommand2=senderCommand2+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+		else:
+			senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+		receiverURL=f"udp://{dst_host_ipv4}:{port}"
 		receiverNode.cmd(f"mkdir records/{receiver}")
-		#entryPusher() ** En kısa yol
+		#receiverCommand=f"ffmpeg -i {receiverURL}"
 		#receiverCommand=f"ffplay -i {receiverURL}"
 		receiverCommand=f"ffmpeg -i {receiverURL} -c copy records/{receiver}/input.ts"
-		#receiverCommand=f"ffmpeg -i {receiverURL}"
 		receiverThread=(HostCommand(receiverNode, receiverCommand))
 		receiverThread.daemon=True
 		receiverThread.start()
 		i=i+1
-def testVideo():
-	videoSource="test.ts"
-	port="1234"
-	senderNode=net.getNodeByName("h14")
-	senderCommand=f"ffmpeg -re -i {videoSource} -c copy -f mpegts udp://10.0.0.1:1234 -c copy -f mpegts udp://10.0.0.2:1234 -c copy -f mpegts udp://10.0.0.3:1234 -c copy -f mpegts udp://10.0.0.4:1234 -c copy -f mpegts udp://10.0.0.5:1234 -c copy -f mpegts udp://10.0.0.6:1234"
-	senderThread=(HostCommand(senderNode, senderCommand))
-	senderThread.daemon=True
-	senderThread.start()
-	print("*************Test Start*************")
-def sendVideo():
-	videoSource="output.ts"
-	port="1234"
-	senderNode=net.getNodeByName("h14")
-	senderCommand=f"ffmpeg -re -i {videoSource} -c copy -f mpegts udp://10.0.0.1:1234 -c copy -f mpegts udp://10.0.0.2:1234 -c copy -f mpegts udp://10.0.0.3:1234 -c copy -f mpegts udp://10.0.0.4:1234 -c copy -f mpegts udp://10.0.0.5:1234 -c copy -f mpegts udp://10.0.0.6:1234"
-	senderThread=(HostCommand(senderNode, senderCommand))
-	senderThread.daemon=True
-	senderThread.start()
-	print("sender start")
-	senderThread.join()
+	senderThread1=(HostCommand(senderNode1, senderCommand1))
+	senderThread1.daemon=True
+	senderThread1.start()
+	senderThread2=(HostCommand(senderNode2, senderCommand2))
+	senderThread2.daemon=True
+	senderThread2.start()
+	info(f'[INFO]********Video gönderim başladı*******\n')
+	senderThread2.join()
+	info(f'[INFO]********Video gönderim bitti*******\n')
 
 def killFfmegPorts(senderNode):
-	#senderNode=net.getNodeByName(senderNodes)
+	node=net.getNodeByName(senderNode)
 	commandCheckPort="pgrep -x ffmpeg"
 	commandKillPort="pkill -x ffmpeg"
-	result=senderNode.cmd(commandCheckPort)
+	result=node.cmd(commandCheckPort)
 	while(result !=""):
-		senderNode.cmd(commandKillPort)
+		node.cmd(commandKillPort)
 		print("port Killed: ",result)
-		result=senderNode.cmd(commandCheckPort)
+		result=node.cmd(commandCheckPort)
+
+def cleanMininet():
+	script_path="cleanMininet.sh"
+	subprocess.run(['bash',script_path])
+
+def deletefile():
+	script_path="deleteFile.sh"
+	subprocess.run(['bash',script_path])
 
 def calcPsnrSsim(receiver):
 	host=net.getNodeByName(receiver)
@@ -250,15 +272,8 @@ def calcPsnrSsim(receiver):
 	first=float(ssimResault.split("All:")[1].split(" ")[0])
 	second=float(ssimResault.split("All:")[1].split(" ")[1].replace("(","").replace(")",""))
 	print(f"***********PSNR:{psnrResault}, SSIM F:{first}, SSIM S:{second}******")
-	print("")
 	return psnrResault, first, second
-def cleanMininet():
-	script_path="cleanMininet.sh"
-	subprocess.run(['bash',script_path])
 
-def deletefile():
-	script_path="deleteFile.sh"
-	subprocess.run(['bash',script_path])
 class HostCommand(Thread):
 	def __init__(self, host:Host, command:str):
 		Thread.__init__(self)
