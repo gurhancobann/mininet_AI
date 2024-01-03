@@ -128,21 +128,21 @@ def startNetwork():
 	# wireThread.start()
 	info(f'[INFO]*********Test Yayını Başlatıldı********\n')
 	info(f'[INFO]**********Test Yayını Alınıyor*********\n')
-	test(["h1","h2","h3","h4","h5"])
-	killFfmegPorts("h10")
-	killFfmegPorts("h14")
-	info(f'[INFO]********Test Bitti - Aktif thread sayısı : {threading.active_count()}*******\n')
-	info(f'[INFO]********ASıl İşlem *******\n')
-	roundRobin(["h1","h2","h3","h4","h5","h6"])
-	sleep(10)
-	activeThreadList=threading.enumerate()
-	activeThreadList.pop(0)
-	print(activeThreadList)
-	#activeThreadList[len(activeThreadList)-1].join()
-	info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
-	killFfmegPorts("h10")
-	killFfmegPorts("h14")
-	info(f'[INFO]********PSNR & SSIM Değerleri Hesaplanıyor*******\n')
+	# test(["h1","h2","h3","h4","h5"])
+	# killFfmegPorts("h10")
+	# killFfmegPorts("h14")
+	# info(f'[INFO]********Test Bitti - Aktif thread sayısı : {threading.active_count()}*******\n')
+	# info(f'[INFO]********ASıl İşlem *******\n')
+	# roundRobin(["h1","h2","h3","h4","h5","h6"])
+	# sleep(10)
+	# activeThreadList=threading.enumerate()
+	# activeThreadList.pop(0)
+	# print(activeThreadList)
+	# #activeThreadList[len(activeThreadList)-1].join()
+	# info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
+	# killFfmegPorts("h10")
+	# killFfmegPorts("h14")
+	# info(f'[INFO]********PSNR & SSIM Değerleri Hesaplanıyor*******\n')
 	for host in ["h1","h2","h3","h4","h5","h6"]:
 		psnr, ssim_first, ssim_second=calcPsnrSsim(host)
 		dataRow={"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"type":2}
@@ -251,7 +251,7 @@ def deletefile():
 	script_path="deleteFile.sh"
 	subprocess.run(['bash',script_path])
 
-def calcPsnrSsim(receiver):
+def calcPsnrSsim(receiver:str):
 	host=net.getNodeByName(receiver)
 	print(f"***********{host} için PSNR ve SSİM değerleri hesaplanıyor******")
 	videoSource="output.ts"

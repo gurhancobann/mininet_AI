@@ -129,6 +129,7 @@ def startNetwork():
 	info(f'[INFO]*********Test Yayını Başlatıldı********\n')
 	info(f'[INFO]**********Test Yayını Alınıyor*********\n')
 	test(["h1","h2","h3","h4","h5"])
+	sleep(5)
 	killFfmegPorts("h10")
 	killFfmegPorts("h14")
 	info(f'[INFO]********Test Bitti - Aktif thread sayısı : {threading.active_count()}*******\n')
@@ -145,7 +146,7 @@ def startNetwork():
 	info(f'[INFO]********PSNR & SSIM Değerleri Hesaplanıyor*******\n')
 	for host in ["h1","h2","h3","h4","h5","h6"]:
 		psnr, ssim_first, ssim_second=calcPsnrSsim(host)
-		dataRow={"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"type":2}
+		dataRow={"host":host,"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"type":2}
 		dataFrame=dataFrame.append(dataRow,ignore_index=True)
 	
 	dataFrame.to_csv("data.csv",sep=",",index=False,encoding="utf-8")
@@ -172,7 +173,7 @@ def test(receivers):
 		receiverNode=net.getNodeByName(receiver)
 		dst_host_mac=receiverNode.MAC()
 		dst_host_ipv4=receiverNode.IP()
-		if(i%2==0):
+		if(i%2==1):
 			print("receiver: "+receiver+" - > h14")
 			src_host_mac=senderNode2.MAC()
 			src_host_ipv4=senderNode2.IP()
@@ -210,7 +211,7 @@ def roundRobin(receivers):
 		print("receiver: "+receiver)
 		receiverNode=net.getNodeByName(receiver)
 		dst_host_ipv4=receiverNode.IP()
-		if(i%2==0):
+		if(i%2==1):
 			senderCommand2=senderCommand2+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
 		else:
 			senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
@@ -272,6 +273,7 @@ def calcPsnrSsim(receiver):
 	first=float(ssimResault.split("All:")[1].split(" ")[0])
 	second=float(ssimResault.split("All:")[1].split(" ")[1].replace("(","").replace(")",""))
 	print(f"***********PSNR:{psnrResault}, SSIM F:{first}, SSIM S:{second}******")
+	print("")
 	return psnrResault, first, second
 
 class HostCommand(Thread):
