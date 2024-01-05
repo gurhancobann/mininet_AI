@@ -11,6 +11,8 @@ from mininet.topo import Topo
 from mininet.link import TCLink
 from time import sleep, perf_counter
 
+from nfstream import NFStreamer
+
 import json
 from multiprocessing import Pool
 from concurrent.futures import ThreadPoolExecutor
