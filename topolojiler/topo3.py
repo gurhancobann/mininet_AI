@@ -104,6 +104,8 @@ def startNetwork():
 	info(f'[INFO]*************Mininet için memory temizleniyor************\n')
 	global net
 	global activeThreadList
+	
+	serverList={}
 	activeThreadList=[]
 	net=None
 	dataFrame=pd.read_csv('data.csv')
@@ -130,6 +132,12 @@ def startNetwork():
 	# wireThread=HostCommand(net.getNodeByName("s4"),"wireshark")
 	# wireThread.daemon=True
 	# wireThread.start()
+
+	# önce bir fonksiyonla h1, h2, h3 ve h4 ü h10a gönder 3 saniye Bekle
+	# sonra yeni bir fonksiyonla h5 i ve h6 yi h14 e gönderebilmeyi dene. 
+	# yükün kontrol edilebileceği başka parametreler ara.
+
+
 	info(f'[INFO]*********Test Yayını Başlatıldı********\n')
 	info(f'[INFO]**********Test Yayını Alınıyor*********\n')
 	test(["h1","h2","h3","h4","h5"])
@@ -150,7 +158,7 @@ def startNetwork():
 	info(f'[INFO]********PSNR & SSIM Değerleri Hesaplanıyor*******\n')
 	for host in ["h1","h2","h3","h4","h5","h6"]:
 		psnr, ssim_first, ssim_second=calcPsnrSsim(host)
-		dataRow={"host":host,"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"type":2}
+		dataRow={"host":host,"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"type":2,"server":serverList[host]}
 		dataFrame=dataFrame.append(dataRow,ignore_index=True)
 	
 	dataFrame.to_csv("data.csv",sep=",",index=False,encoding="utf-8")
