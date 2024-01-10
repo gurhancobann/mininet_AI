@@ -36,3 +36,4 @@ if __name__=='__main__':
     streamThread1.join()
     print(f"toplam paket 1: {streamThread1.result[0]}, zaman 1: {streamThread1.result[1]}")
     print(f"toplam paket 2: {streamThread2.result[0]}, zaman 2: {streamThread2.result[1]}")
+    
