@@ -11,6 +11,8 @@ from mininet.topo import Topo
 from mininet.link import TCLink
 from time import sleep, perf_counter
 
+from nfstream import NFStreamer
+
 import json
 from multiprocessing import Pool
 from concurrent.futures import ThreadPoolExecutor
@@ -19,7 +21,6 @@ from threading import Thread
 import floodlightRestApi
 import subprocess
 import pandas as pd
-from nfstream import NFStreamer
 
 class NsfnetTopo(Topo):
 	"""
@@ -99,19 +100,16 @@ class NsfnetTopo(Topo):
 		self.addLink(s13, h13, **linkOptns1)
 		self.addLink(s14, h14, **linkOptns1)
 def startNetwork():
+	cleanMininet()
+	info(f'[INFO]*************Mininet için memory temizleniyor************\n')
 	global net
 	global activeThreadList
-	global serverList
-	serverList={"h1":"h14",
-			 "h2":"h14",
-			 "h3":"h14",
-			 "h4":"h14",
-			 "h5":"h10",}
+	
+	serverList={}
 	activeThreadList=[]
 	net=None
 	dataFrame=pd.read_csv('data.csv')
 	dataRow={}
-	cleanMininet()
 
 	net=Mininet(topo=NsfnetTopo(),link=TCLink, build=False, switch=OVSKernelSwitch, autoSetMacs=True, waitConnected=True)
 	remote_ip="127.0.0.1"
@@ -134,30 +132,33 @@ def startNetwork():
 	# wireThread=HostCommand(net.getNodeByName("s4"),"wireshark")
 	# wireThread.daemon=True
 	# wireThread.start()
-	#serverName="h10"
+
+	# önce bir fonksiyonla h1, h2, h3 ve h4 ü h10a gönder 3 saniye Bekle
+	# sonra yeni bir fonksiyonla h5 i ve h6 yi h14 e gönderebilmeyi dene. 
+	# yükün kontrol edilebileceği başka parametreler ara.
+
+
 	info(f'[INFO]*********Test Yayını Başlatıldı********\n')
-	test(["h1","h2","h3","h4","h5"],serverList)
-	print(json.dumps(serverList,indent=4))
-	info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
-	info(f'[INFO]********Testin Bitmesi Bekleniyor*******\n')
-	sleep(16)
+	info(f'[INFO]**********Test Yayını Alınıyor*********\n')
+	test(["h1","h2","h3","h4","h5"])
+	sleep(5)
 	killFfmegPorts("h10")
 	killFfmegPorts("h14")
 	info(f'[INFO]********Test Bitti - Aktif thread sayısı : {threading.active_count()}*******\n')
 	info(f'[INFO]********ASıl İşlem *******\n')
-	LoadBalacing(["h1","h2","h3","h4","h5","h6"],serverList)
+	roundRobin(["h1","h2","h3","h4","h5","h6"])
 	sleep(10)
-	# activeThreadList=threading.enumerate()
-	# activeThreadList.pop(0)
-	killFfmegPorts("h10")
-	killFfmegPorts("h14")
+	activeThreadList=threading.enumerate()
+	activeThreadList.pop(0)
 	print(activeThreadList)
 	#activeThreadList[len(activeThreadList)-1].join()
-	info(f'[INFO]********Video bitti*******\n')
+	info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
+	killFfmegPorts("h10")
+	killFfmegPorts("h14")
 	info(f'[INFO]********PSNR & SSIM Değerleri Hesaplanıyor*******\n')
 	for host in ["h1","h2","h3","h4","h5","h6"]:
 		psnr, ssim_first, ssim_second=calcPsnrSsim(host)
-		dataRow={"host":host,"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"type":3,"server":serverList[host]}
+		dataRow={"host":host,"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"type":2,"server":serverList[host]}
 		dataFrame=dataFrame.append(dataRow,ignore_index=True)
 	
 	dataFrame.to_csv("data.csv",sep=",",index=False,encoding="utf-8")
@@ -168,34 +169,32 @@ def startNetwork():
 		print(f"Excaption {e}")
 	
 	cleanMininet()
-	
-	info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
 	# wireThread.join()
-
-def test(receivers,serverList):
+	
+def test(receivers):
 	port="1234"
 	videoSource="test.ts"
+	i=0
+	senderNode1, senderNode2=net.getNodeByName("h10"), net.getNodeByName("h14")
 	num_paths=3
 	path_index=0
 	senderCommand1=f"ffmpeg -re -i {videoSource}"
 	senderCommand2=f"ffmpeg -re -i {videoSource}"
 	for receiver in receivers:
+		
 		receiverNode=net.getNodeByName(receiver)
 		dst_host_mac=receiverNode.MAC()
 		dst_host_ipv4=receiverNode.IP()
-		senderNode=net.getNodeByName(serverList[receiver])
-
-		print(f"host : {receiver} - sender : {serverList[receiver]}")
-		if(serverList[receiver]=="h10"):
-			print(f"server : h10")
-			src_host_mac=senderNode.MAC()
-			src_host_ipv4=senderNode.IP()
-			senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
-		if(serverList[receiver]=="h14"):
-			print(f"server :h14")
-			src_host_mac=senderNode.MAC()
-			src_host_ipv4=senderNode.IP()
+		if(i%2==1):
+			print("receiver: "+receiver+" - > h14")
+			src_host_mac=senderNode2.MAC()
+			src_host_ipv4=senderNode2.IP()
 			senderCommand2=senderCommand2+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+		else:
+			print("receiver: "+receiver+" - > h10")
+			src_host_mac=senderNode1.MAC()
+			src_host_ipv4=senderNode1.IP()
+			senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
 		
 		floodlightRestApi.pathPusher(src_host_mac, src_host_ipv4, dst_host_mac,dst_host_ipv4,num_paths,path_index)
 		receiverURL=f"udp://{dst_host_ipv4}:{port}"
@@ -203,42 +202,40 @@ def test(receivers,serverList):
 		receiverThread=(HostCommand(receiverNode, receiverCommand))
 		receiverThread.daemon=True
 		receiverThread.start()
+		i=i+1
 		sleep(2)
-	senderNode1=net.getNodeByName("h10")
-	senderNode2=net.getNodeByName("h14")
-	
 	senderThread1=(HostCommand(senderNode1, senderCommand1))
 	senderThread1.daemon=True
 	senderThread1.start()
 	senderThread2=(HostCommand(senderNode2, senderCommand2))
 	senderThread2.daemon=True
 	senderThread2.start()
-	print("2 sn bekleniyor")
-	sleep(2)
-	testH6()
 	senderThread2.join()
-	
 
-def LoadBalacing(receivers,serverList):
+def roundRobin(receivers):
 	port="1234"
 	videoSource="output.ts"
+	i=0
 	senderNode1, senderNode2=net.getNodeByName("h10"), net.getNodeByName("h14")
 	senderCommand1=f"ffmpeg -re -i {videoSource}"
 	senderCommand2=f"ffmpeg -re -i {videoSource}"
 	for receiver in receivers:
+		print("receiver: "+receiver)
 		receiverNode=net.getNodeByName(receiver)
 		dst_host_ipv4=receiverNode.IP()
-		if(serverList[receiver]=="h10"):
-			senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
-		if(serverList[receiver]=="h14"):
+		if(i%2==1):
 			senderCommand2=senderCommand2+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+		else:
+			senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
 		receiverURL=f"udp://{dst_host_ipv4}:{port}"
 		receiverNode.cmd(f"mkdir records/{receiver}")
+		#receiverCommand=f"ffmpeg -i {receiverURL}"
+		#receiverCommand=f"ffplay -i {receiverURL}"
 		receiverCommand=f"ffmpeg -i {receiverURL} -c copy records/{receiver}/input.ts"
 		receiverThread=(HostCommand(receiverNode, receiverCommand))
 		receiverThread.daemon=True
 		receiverThread.start()
-	
+		i=i+1
 	senderThread1=(HostCommand(senderNode1, senderCommand1))
 	senderThread1.daemon=True
 	senderThread1.start()
@@ -249,29 +246,6 @@ def LoadBalacing(receivers,serverList):
 	senderThread2.join()
 	info(f'[INFO]********Video gönderim bitti*******\n')
 
-
-def testH6():
-	print("testH6 Başladı")
-	streamThread1=(streamer("s15-eth2","10.0.0.10"))
-	streamThread1.daemon=True
-	streamThread1.start()
-	streamThread2= streamer("s14-eth3","10.0.0.14")
-	streamThread2.daemon=True
-	streamThread2.start()
-	streamThread2.join()
-	streamThread1.join()
-	print(f"toplam paket 1: {streamThread1.result[0]}, zaman 1: {streamThread1.result[1]}")
-	print(f"toplam paket 2: {streamThread2.result[0]}, zaman 2: {streamThread2.result[1]}")
-	if(streamThread1.result[1]==0 or streamThread2.result[1]==0):
-		testH6()
-	else:
-		yuk1=streamThread1.result[0]/streamThread1.result[1]
-		yuk2=streamThread2.result[0]/streamThread2.result[1]
-	if (yuk1 < yuk2):
-		serverList["h6"]="h10"
-	else:
-		serverList["h6"]="h14"
-
 def killFfmegPorts(senderNode):
 	node=net.getNodeByName(senderNode)
 	commandCheckPort="pgrep -x ffmpeg"
@@ -281,6 +255,14 @@ def killFfmegPorts(senderNode):
 		node.cmd(commandKillPort)
 		print("port Killed: ",result)
 		result=node.cmd(commandCheckPort)
+
+def cleanMininet():
+	script_path="cleanMininet.sh"
+	subprocess.run(['bash',script_path])
+
+def deletefile():
+	script_path="deleteFile.sh"
+	subprocess.run(['bash',script_path])
 
 def calcPsnrSsim(receiver):
 	host=net.getNodeByName(receiver)
@@ -306,14 +288,6 @@ def calcPsnrSsim(receiver):
 	print("")
 	return psnrResault, first, second
 
-def cleanMininet():
-	script_path="cleanMininet.sh"
-	subprocess.run(['bash',script_path])
-
-def deletefile():
-	script_path="deleteFile.sh"
-	subprocess.run(['bash',script_path])
-
 class HostCommand(Thread):
 	def __init__(self, host:Host, command:str):
 		Thread.__init__(self)
@@ -322,28 +296,6 @@ class HostCommand(Thread):
 		self.result=None
 	def run(self):
 		self.result=self._host.cmd(self._command)
-
-class streamer(Thread):
-    def __init__(self, sources:str,ip:str):
-          Thread.__init__(self)
-          self._sources=sources
-          self._ip=ip
-          self.result=None
-    def run(self):
-        flow_streamer=NFStreamer(source=self._sources,
-                                statistical_analysis=True,
-                                idle_timeout=10, active_timeout=5, max_nflows=5
-                                #active_timeout 5 saniyelik süreyi ölçüyor
-                                )
-        totalPaket=0
-        zaman=0
-        
-        for flow in flow_streamer:
-            if((flow.src_ip==self._ip) or (flow.dst_ip==self._ip)): #and (flow.application_name=="Unknown" and flow.application_category_name=="Unspecified"):
-                totalPaket=totalPaket+flow.bidirectional_packets
-                zaman=zaman+flow.bidirectional_duration_ms
-        self.result=[totalPaket,zaman]
-    
 
 
 if __name__ == '__main__':
