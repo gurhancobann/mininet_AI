@@ -15,7 +15,7 @@ import json
 from multiprocessing import Pool
 from concurrent.futures import ThreadPoolExecutor
 import threading
-from threading import Thread
+from threading import Thread, Event
 import floodlightRestApi
 import subprocess
 import pandas as pd
@@ -102,11 +102,7 @@ def startNetwork():
 	global net
 	global activeThreadList
 	global serverList
-	serverList={"h1":"h14",
-			 "h2":"h14",
-			 "h3":"h14",
-			 "h4":"h14",
-			 "h5":"h10",}
+	serverList={}
 	activeThreadList=[]
 	net=None
 	dataFrame=pd.read_csv('data.csv')
@@ -124,6 +120,7 @@ def startNetwork():
 	net.start()
 	info(f'[INFO]*************2sn Bekleniyor************\n')
 	sleep(2)
+	# net.pingAll()
 	floodlightRestApi.deleteAllFlows()
 	info(f'[INFO]**********Tüm Akışlar Silindi**********\n')
 
@@ -136,15 +133,18 @@ def startNetwork():
 	# wireThread.start()
 	#serverName="h10"
 	info(f'[INFO]*********Test Yayını Başlatıldı********\n')
-	test(["h1","h2","h3","h4","h5"],serverList)
+	selectServer(["h2","h5","h3","h4","h1","h6"])
 	print(json.dumps(serverList,indent=4))
-	info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
-	info(f'[INFO]********Testin Bitmesi Bekleniyor*******\n')
-	sleep(16)
+	#test(["h1","h2","h3","h4","h5"],serverList)
+	#print(json.dumps(serverList,indent=4))
+	# info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
+	# info(f'[INFO]********Testin Bitmesi Bekleniyor*******\n')
+	# sleep(16)
 	killFfmegPorts("h10")
 	killFfmegPorts("h14")
 	info(f'[INFO]********Test Bitti - Aktif thread sayısı : {threading.active_count()}*******\n')
 	info(f'[INFO]********ASıl İşlem *******\n')
+	sleep(10)
 	LoadBalacing(["h1","h2","h3","h4","h5","h6"],serverList)
 	sleep(10)
 	# activeThreadList=threading.enumerate()
@@ -172,6 +172,78 @@ def startNetwork():
 	info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
 	# wireThread.join()
 
+def selectServer(receivers):
+	port="1234"
+	videoSource="test.ts"
+	num_paths=3
+	path_index=0
+	senderCommand1=f"ffmpeg -re -t 15 -i {videoSource}"
+	senderCommand2=f"ffmpeg -re -t 15 -i {videoSource}"
+	hosts=[]
+	h10Toplam=0
+	h14Toplam=0
+	for receiver in receivers:
+		receiverNode=net.getNodeByName(receiver)
+		dst_host_ipv4=receiverNode.IP()
+		dst_host_mac=receiverNode.MAC()
+		hosts.append(receiver)
+		if(len(serverList)==0):
+			print("serverList Boş")
+			sleep(3)
+			h10gelen,h14gelen=testHostFloodlight(receiver,h10Toplam,h14Toplam)
+			#testHostFloodlight2(receiver)
+			if(serverList[receiver]=="h10"):
+				senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+			if(serverList[receiver]=="h14"):
+				senderCommand2=senderCommand2+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+		else:
+			print("serverList Boşdeğil")
+			sleep(3)
+			for host in hosts:
+				print(host)
+				receiverURL=f"udp://{net.getNodeByName(host).IP()}:{port}"
+				receiverCommand=f"ffmpeg -timeout 5000 -i {receiverURL}"
+				receiverThread=(HostCommand(net.getNodeByName(host), receiverCommand))
+				receiverThread.daemon=True
+				receiverThread.start()
+			senderNode1=net.getNodeByName("h10")
+			senderNode2=net.getNodeByName("h14")
+			senderThread1=(HostCommand(senderNode1, senderCommand1))
+			senderThread1.daemon=True
+			senderThread1.start()
+			senderThread2=(HostCommand(senderNode2, senderCommand2))
+			senderThread2.daemon=True
+			senderThread2.start()
+			sleep(5)
+			h10gelen,h14gelen=testHostFloodlight(receiver,h10Toplam,h14Toplam)
+			#testHostFloodlight2(receiver)
+			if(serverList[receiver]=="h10"):
+				senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+			if(serverList[receiver]=="h14"):
+				senderCommand2=senderCommand2+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+			sleep(21)
+			senderThread1.stop()
+			senderThread2.stop()
+			receiverThread.stop()
+			
+		num_paths=3
+		path_index=0
+		src_host_mac=net.getNodeByName(serverList[receiver]).MAC()
+		src_host_ipv4=net.getNodeByName(serverList[receiver]).IP()
+		floodlightRestApi.pathPusher(src_host_mac, src_host_ipv4, dst_host_mac,dst_host_ipv4,num_paths,path_index)
+		# test=netStatistic(serverList[receiver],receiver,0)
+		sleep(3)
+		info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
+		info(f'[INFO]****** Ping Stats *****\n')
+		avgRTT, packetLoss = getPingStats(receiver, serverList[receiver])
+		# dataRow['average_rtt'] = avgRTT
+		# dataRow['packet_loss'] = packetLoss
+		print(f"""*** Average RTT: {avgRTT}\nPacket Loss: {packetLoss}""")
+		info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
+		h10Toplam=h10Toplam+h10gelen
+		h14Toplam=h14Toplam+h14gelen
+		# killFfmegPorts("h10")
+		# killFfmegPorts("h14")
 def test(receivers,serverList):
 	port="1234"
 	videoSource="test.ts"
@@ -197,7 +269,7 @@ def test(receivers,serverList):
 			src_host_ipv4=senderNode.IP()
 			senderCommand2=senderCommand2+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
 		
-		floodlightRestApi.pathPusher(src_host_mac, src_host_ipv4, dst_host_mac,dst_host_ipv4,num_paths,path_index)
+		#floodlightRestApi.pathPusher(src_host_mac, src_host_ipv4, dst_host_mac,dst_host_ipv4,num_paths,path_index)
 		receiverURL=f"udp://{dst_host_ipv4}:{port}"
 		receiverCommand=f"ffmpeg -i {receiverURL}"
 		receiverThread=(HostCommand(receiverNode, receiverCommand))
@@ -226,6 +298,7 @@ def LoadBalacing(receivers,serverList):
 	senderCommand1=f"ffmpeg -re -i {videoSource}"
 	senderCommand2=f"ffmpeg -re -i {videoSource}"
 	for receiver in receivers:
+		sleep(1)
 		receiverNode=net.getNodeByName(receiver)
 		dst_host_ipv4=receiverNode.IP()
 		if(serverList[receiver]=="h10"):
@@ -272,6 +345,118 @@ def testH6():
 	else:
 		serverList["h6"]="h14"
 
+	num_paths=3
+	path_index=0
+	receiverNode=net.getNodeByName("h6")
+	senderNode=net.getNodeByName(serverList["h6"])
+	src_host_ipv4=senderNode.IP()
+	src_host_mac=senderNode.MAC()
+	dst_host_ipv4=receiverNode.IP()
+	dst_host_mac=receiverNode.MAC()
+	floodlightRestApi.pathPusher(src_host_mac, src_host_ipv4, dst_host_mac,dst_host_ipv4,num_paths,path_index)
+
+def testHostFloodlight(receiver,h10,h14):
+	print(f"h10 önceki :{h10}, h14 önceki :{h14}")
+	print(f"testHost {receiver} için Başladı")
+	sleep(2)
+	h10_alinan_bytes,h10_iletilen_bytes,h10_sure=floodlightRestApi.getStats(net.getNodeByName("h10").IP())
+	h14_alinan_bytes,h14_iletilen_bytes,h14_sure=floodlightRestApi.getStats(net.getNodeByName("h14").IP())
+	print(f"h10 Alinan: {h10_alinan_bytes}, h10 İletilen : {h10_iletilen_bytes}")
+	print(f"h14 Alinan: {h14_alinan_bytes}, h14 İletilen : {h14_iletilen_bytes}")
+	if(h10_sure==0):
+		serverList[receiver]="h10"
+	elif(h14_sure==0):
+		serverList[receiver]="h14"
+	else:
+		print(f"h10 toplam bytes: {h10_alinan_bytes+h10_iletilen_bytes} sure: {h10_sure}")
+		print(f"h14 toplam bytes: {h14_alinan_bytes+h14_iletilen_bytes} sure: {h14_sure}")
+		yuk1=(h10_alinan_bytes+h10_iletilen_bytes)/h10_sure
+		yuk2=(h14_alinan_bytes+h14_iletilen_bytes)/h14_sure
+		if (yuk1 < yuk2):
+			serverList[receiver]="h10"
+		else:
+			serverList[receiver]="h14"
+	print(json.dumps(serverList,indent=4))
+	return (h10_alinan_bytes+h10_iletilen_bytes),(h14_alinan_bytes+h14_iletilen_bytes)
+
+def getPingStats(sender: str, receiver: str) -> [float, float]:
+	senderNode, receiverNode = net.getNodeByName(sender), net.getNodeByName(receiver)
+	receiverIpv4 = receiverNode.IP()
+	print("Receiver ipv4 -> ", receiverIpv4)
+	packetCount = "500"
+	command = f"ping {receiverIpv4} -c {packetCount} -f"
+	result = senderNode.cmd(command)
+	ping_parser = pingparsing.PingParsing()
+	result = ping_parser.parse(result).as_dict()
+	print(result)
+	packetLoss = result["packet_loss_rate"]
+	avgRTT = result["rtt_avg"]
+	return avgRTT, packetLoss
+
+def netStatistic(sender:str, receiver:str, bandWidth):
+	server, client = net.getNodeByName(sender), net.getNodeByName(receiver)
+	port = "5555"
+	time=15
+	serverCommand = f"iperf3 -s -p {port} -i 1 -1"
+	clientCommand = f"iperf3 -c {server.IP()} -p {port} -b {bandWidth} -R -t {time} -J"
+	serverThread = HostCommand(server, serverCommand)
+	serverThread.daemon = True
+	clientThread = HostCommand(client, clientCommand) 
+	clientThread.daemon = True
+	sleep(1)
+	serverThread.start()
+	sleep(1) # time.sleep
+	clientThread.start()
+	serverThread.join()
+	clientThread.join()
+	print(json.dumps((clientThread.result),indent=4))
+	result = json.loads(clientThread.result)["end"]
+	return result
+
+
+def testHostFloodlight2(receiver):
+	print(f"testHost {receiver} için Başladı")
+	h10_rx=floodlightRestApi.getStats2(net.getNodeByName("h10").IP())
+	sleep(1)
+	h14_rx=floodlightRestApi.getStats2(net.getNodeByName("h14").IP())
+	if(h10_rx==0):
+		serverList[receiver]="h10"
+	elif(h14_rx==0):
+		serverList[receiver]="h14"
+	else:
+		print(f"h10 toplam bytes: {h10_rx}")
+		print(f"h14 toplam bytes: {h14_rx}")
+		if (h10_rx < h14_rx):
+			serverList[receiver]="h10"
+		else:
+			serverList[receiver]="h14"
+	print(json.dumps(serverList,indent=4))
+
+def testHost(receiver):
+	print(f"testHost {receiver} için Başladı")
+	streamThread1=(streamer("s15-eth2","10.0.0.10"))
+	streamThread1.daemon=True
+	streamThread1.start()
+	streamThread2= streamer("s14-eth3","10.0.0.14")
+	streamThread2.daemon=True
+	streamThread2.start()
+	streamThread1.join()
+	streamThread2.join()
+	print(f"toplam paket 1: {streamThread1.result[0]}, zaman 1: {streamThread1.result[1]}")
+	print(f"toplam paket 2: {streamThread2.result[0]}, zaman 2: {streamThread2.result[1]}")
+	info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
+	if(streamThread1.result[1]==0):
+		serverList[receiver]="h10" #en yakın olarak guncellenebilir
+	elif(streamThread2.result[1]==0):
+		serverList[receiver]="h14"
+	else:
+		yuk1=streamThread1.result[0]/streamThread1.result[1]
+		yuk2=streamThread2.result[0]/streamThread2.result[1]
+		if (yuk1 < yuk2):
+			serverList[receiver]="h10"
+		else:
+			serverList[receiver]="h14"
+	print(json.dumps(serverList,indent=4))
 def killFfmegPorts(senderNode):
 	node=net.getNodeByName(senderNode)
 	commandCheckPort="pgrep -x ffmpeg"
@@ -320,8 +505,11 @@ class HostCommand(Thread):
 		self._host=host
 		self._command=command
 		self.result=None
+		self._stop_event=Event()
 	def run(self):
 		self.result=self._host.cmd(self._command)
+	def stop(self):
+		self._stop_event.is_set()
 
 class streamer(Thread):
     def __init__(self, sources:str,ip:str):
@@ -332,14 +520,14 @@ class streamer(Thread):
     def run(self):
         flow_streamer=NFStreamer(source=self._sources,
                                 statistical_analysis=True,
-                                idle_timeout=10, active_timeout=5, max_nflows=5
+                                active_timeout=5, idle_timeout=15,max_nflows=5
                                 #active_timeout 5 saniyelik süreyi ölçüyor
                                 )
         totalPaket=0
         zaman=0
         
         for flow in flow_streamer:
-            if((flow.src_ip==self._ip) or (flow.dst_ip==self._ip)): #and (flow.application_name=="Unknown" and flow.application_category_name=="Unspecified"):
+            if((flow.src_ip==self._ip) or (flow.dst_ip==self._ip)) and (flow.application_name=="Unknown" and flow.application_category_name=="Unspecified"):
                 totalPaket=totalPaket+flow.bidirectional_packets
                 zaman=zaman+flow.bidirectional_duration_ms
         self.result=[totalPaket,zaman]
@@ -348,6 +536,4 @@ class streamer(Thread):
 
 if __name__ == '__main__':
 	setLogLevel('info')
-	startNetwork()
-
-		
+	startNetwork()	

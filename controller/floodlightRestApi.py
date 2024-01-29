@@ -1,4 +1,5 @@
 import requests
+import json
 
 def flowPusher(flow:dict):
     """
@@ -45,7 +46,7 @@ def getDevices() -> dict:
     url = "http://127.0.0.1:8080/wm/device/"
     response = requests.get(url)
     response_json = response.json()
-    print("[INFO]****** GET METHOD RESULT *****\n", response_json["devices"])
+    #print("[INFO]****** GET METHOD RESULT *****\n", response_json["devices"])
     return response_json["devices"]
 
 def getDevicesByMac(mac: str) -> dict:
@@ -157,7 +158,48 @@ def getSwitchStatByPort(switch:str, port):
     response_json = response.json()
     return response_json
 
+def getStats(ip:str):
+    cihazlar=getDevices()
+    port=None
+    switch=None
+    for cihaz in cihazlar:
+        if cihaz["ipv4"]==[ip]:
+            port=cihaz["attachmentPoint"][0]["port"]
+            switch=cihaz["attachmentPoint"][0]["switch"]
+    url = f"http://127.0.0.1:8080/wm/core/switch/{switch}/port/json"
+    response = requests.get(url)
+    response_json = response.json()
+    sonuclar=response_json["port_reply"]
+    sonuclar=sonuclar[0]["port"]
+    alinan_bytes=0
+    iletilen_bytes=0
+    sure=0
+
+    for sonuc in sonuclar:
+        if(sonuc["port_number"]==port):
+            alinan_bytes=int(sonuc["receive_bytes"])
+            iletilen_bytes=int(sonuc["transmit_bytes"])
+            sure=int(sonuc["duration_sec"])
+    #print(alinan_bytes+iletilen_bytes)
+    return alinan_bytes, iletilen_bytes,sure
+
+def getStats2(ip:str):
+    cihazlar=getDevices()
+    port=None
+    switch=None
+    for cihaz in cihazlar:
+        if cihaz["ipv4"]==[ip]:
+            port=cihaz["attachmentPoint"][0]["port"]
+            switch=cihaz["attachmentPoint"][0]["switch"]
+    url = f"http://127.0.0.1:8080/wm/statistics/bandwidth/{switch}/{port}/json"
+    response = requests.get(url)
+    response_json = response.json()
+    print(response_json[0]["bits-per-second-rx"])
+    return int(response_json[0]["bits-per-second-rx"])
+    
 if __name__ == "__main__":
+    getStats2("10.0.0.10")
+    getStats2("10.0.0.14")
     # getPathById Test Codes
     # src_dpid = "00:00:00:00:00:00:00:01"
     # dst_dpid = "00:00:00:00:00:00:00:10"
@@ -187,4 +229,4 @@ if __name__ == "__main__":
     # deleteAllFlows Test Codes
     # deleteAllFlows()
 
-    print(getSwitchStatByPort("00:00:00:00:00:00:00:01", 4))
+    #print(getSwitchStatByPort("00:00:00:00:00:00:00:01", 4))
