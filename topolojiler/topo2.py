@@ -277,7 +277,6 @@ def calcPsnrSsim(receiver):
 	hostThread.start()
 	hostThread.join()
 	psnrResault=hostThread.result
-	print(psnrResault)
 	psnrResault=float(psnrResault.split("\n")[-2].split("average:")[1].split(" ")[0].strip())
 	sleep(1)
 	command=f"ffmpeg -i {videoSource} -i {outputSource} -lavfi '[0:v][1:v]ssim' -f null -"

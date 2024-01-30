@@ -133,7 +133,7 @@ def startNetwork():
 	# wireThread.start()
 	#serverName="h10"
 	info(f'[INFO]*********Test Yayını Başlatıldı********\n')
-	selectServer(["h2","h5","h3","h4","h1","h6"])
+	selectServer(["h4","h1","h2","h5","h3","h6"])
 	print(json.dumps(serverList,indent=4))
 	#test(["h1","h2","h3","h4","h5"],serverList)
 	#print(json.dumps(serverList,indent=4))

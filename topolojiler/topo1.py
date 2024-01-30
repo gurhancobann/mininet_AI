@@ -127,7 +127,7 @@ def startNetwork():
 	# wireThread=HostCommand(net.getNodeByName("s4"),"wireshark")
 	# wireThread.daemon=True
 	# wireThread.start()
-	serverName="h10"
+	serverName="h14"
 	info(f'[INFO]*********Test Yayını Başlatıldı********\n')
 	testVideo(serverName)
 	info(f'[INFO]**********Test Yayını Alınıyor*********\n')
