@@ -120,7 +120,7 @@ def startNetwork():
 	net.start()
 	info(f'[INFO]*************2sn Bekleniyor************\n')
 	sleep(2)
-	# net.pingAll()
+	net.pingAll()
 	floodlightRestApi.deleteAllFlows()
 	info(f'[INFO]**********Tüm Akışlar Silindi**********\n')
 
@@ -359,7 +359,9 @@ def testHostFloodlight(receiver,h10,h14):
 	print(f"h10 önceki :{h10}, h14 önceki :{h14}")
 	print(f"testHost {receiver} için Başladı")
 	sleep(2)
+	print(net.getNodeByName("h10").IP())
 	h10_alinan_bytes,h10_iletilen_bytes,h10_sure=floodlightRestApi.getStats(net.getNodeByName("h10").IP())
+	print(net.getNodeByName("h14").IP())
 	h14_alinan_bytes,h14_iletilen_bytes,h14_sure=floodlightRestApi.getStats(net.getNodeByName("h14").IP())
 	print(f"h10 Alinan: {h10_alinan_bytes}, h10 İletilen : {h10_iletilen_bytes}")
 	print(f"h14 Alinan: {h14_alinan_bytes}, h14 İletilen : {h14_iletilen_bytes}")

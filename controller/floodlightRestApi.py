@@ -90,14 +90,18 @@ def pathPusher(src_host_mac:str, src_host_ipv4:str, dst_host_mac:str, dst_host_i
     path.append({'dpid': dst_switch_dpid, 'port': str(dst_switch_port)})
 
     print(f"Hop Count: {hop_count}\nLatency: {latency}\nPath: {path}")
-
+    lowBandwidth=-1
     for i in range(0,len(path), 2):
         switch_dpid = path[i]["dpid"]
         siwtch_input_port = path[i]["port"]
         siwtch_output_port = path[i+1]["port"]
-
         flow_first_direction_name = f"flow_{switch_dpid}_{siwtch_input_port}_1"
         flow_second_direction_name = f"flow_{switch_dpid}_{siwtch_output_port}_2"
+
+        if(lowBandwidth==-1):
+            lowBandwidth=int(getStatsBandwidth(switch_dpid,siwtch_input_port))
+        elif(lowBandwidth>int(getStatsBandwidth(switch_dpid,siwtch_input_port))):
+            lowBandwidth=int(getStatsBandwidth(switch_dpid,siwtch_input_port))
 
         print("******** switch dpid: ", switch_dpid, " switch input port: ", siwtch_input_port, " switch output port: ", siwtch_output_port)
         
@@ -129,7 +133,7 @@ def pathPusher(src_host_mac:str, src_host_ipv4:str, dst_host_mac:str, dst_host_i
         
         flowPusher(first_direction)
         flowPusher(second_direction)
-
+    return latency,hop_count,lowBandwidth
 def deleteAllFlows():
     url = f"http://127.0.0.1:8080/wm/staticentrypusher/clear/all/json"
     response = requests.get(url)
@@ -194,9 +198,18 @@ def getStats2(ip:str):
     url = f"http://127.0.0.1:8080/wm/statistics/bandwidth/{switch}/{port}/json"
     response = requests.get(url)
     response_json = response.json()
-    print(response_json[0]["bits-per-second-rx"])
-    return int(response_json[0]["bits-per-second-rx"])
-    
+    print(response_json[0]["link-speed-bits-per-second"])
+    # print(response_json[0]["bits-per-second-rx"])
+    # return int(response_json[0]["bits-per-second-rx"])
+    return response_json[0]["link-speed-bits-per-second"]
+
+def getStatsBandwidth(switch,port):
+    url = f"http://127.0.0.1:8080/wm/statistics/bandwidth/{switch}/{port}/json"
+    response = requests.get(url)
+    response_json = response.json()
+    print(response_json[0]["link-speed-bits-per-second"])
+    return response_json[0]["link-speed-bits-per-second"]
+
 if __name__ == "__main__":
     getStats2("10.0.0.10")
     getStats2("10.0.0.14")
