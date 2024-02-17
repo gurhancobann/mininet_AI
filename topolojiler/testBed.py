@@ -60,7 +60,7 @@ class NsfnetTopo(Topo):
 		s13=self.addSwitch('s13',dpid='00:00:00:00:00:00:00:13',protocols="OpenFlow13")
 		s14=self.addSwitch('s14',dpid='00:00:00:00:00:00:00:14',protocols="OpenFlow13")
 		global bandWidth
-		bandWidth=5
+		bandWidth=10
 		linkOptns1=dict(delay='25ms',bw=bandWidth, loss=0, max_queue_size=1000, use_htb=True,cls=TCLink)
 		linkOptns2=dict(delay='25ms',bw=bandWidth, loss=0, max_queue_size=1000, use_htb=True,cls=TCLink)
 	
@@ -130,7 +130,7 @@ def startNetwork():
 
 	#serverName="h10"
 	# info(f'[INFO]*********Test Yayını Başlatıldı********\n')
-	# hosts=["h1","h2","h3","h4","h5","h6"]
+	hosts=["h1","h2","h3","h4","h5","h6"]
 	# hosts=["h2","h3","h4","h5","h1","h6"]
 	# hosts=["h3","h4","h5","h1","h2","h6"]
 	# hosts=["h4","h5","h1","h2","h3","h6"]
@@ -149,7 +149,7 @@ def startNetwork():
 	# hosts=["h2"]
 	######------------------------------------------
 	# hosts=["h3","h1","h6","h7","h2","h8","h5","h4"]
-	hosts=["h8","h3","h7","h2","h6","h4","h1","h5"]
+	# hosts=["h8","h3","h7","h2","h6","h4","h1","h5"]
 	# hosts=["h6","h4","h7","h1","h5","h2","h8","h3"]
 	# hosts=["h5","h7","h4","h3","h1","h6","h2","h8"]
 	# hosts=["h5","h7","h4","h3","h1","h6","h2","h8","h9","h11"]
