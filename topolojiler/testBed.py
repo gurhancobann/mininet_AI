@@ -147,9 +147,15 @@ def startNetwork():
 	# hosts=["h1","h6"]
 	# hosts=["h1"]
 	# hosts=["h2"]
-	
-	
-	
+	######------------------------------------------
+	# hosts=["h3","h1","h6","h7","h2","h8","h5","h4"]
+	hosts=["h8","h3","h7","h2","h6","h4","h1","h5"]
+	# hosts=["h6","h4","h7","h1","h5","h2","h8","h3"]
+	# hosts=["h5","h7","h4","h3","h1","h6","h2","h8"]
+	# hosts=["h5","h7","h4","h3","h1","h6","h2","h8","h9","h11"]
+	# hosts=["h5","h11","h7","h4","h9","h3","h1","h6","h2","h8"]
+	# hosts=["h4","h3","h2","h5","h9","h1","h7","h6","h8"]
+
 	info(f'[INFO]*********Test Yayını Başlatıldı********\n')
 	selectServer(hosts)
 	print(json.dumps(serverList,indent=4))
