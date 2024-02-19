@@ -130,11 +130,11 @@ def startNetwork():
 
 	#serverName="h10"
 	# info(f'[INFO]*********Test Yayını Başlatıldı********\n')
-	hosts=["h1","h2","h3","h4","h5","h6"]
+	# hosts=["h1","h2","h3","h4","h5","h6"]
 	# hosts=["h2","h3","h4","h5","h1","h6"]
 	# hosts=["h3","h4","h5","h1","h2","h6"]
 	# hosts=["h4","h5","h1","h2","h3","h6"]
-	# hosts=["h5","h1","h2","h3","h4","h6"]
+	hosts=["h5","h1","h2","h3","h4","h6"]
 	# hosts=["h1","h2","h3","h4","h5","h6","h7","h8"]
 	# hosts=["h4","h5","h6","h7","h8","h1","h2","h3"]
 	# hosts=["h1","h2","h3","h4","h5","h6","h7"]
