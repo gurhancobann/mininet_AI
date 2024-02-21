@@ -134,7 +134,7 @@ def startNetwork():
 	# hosts=["h2","h3","h4","h5","h1","h6"]
 	# hosts=["h3","h4","h5","h1","h2","h6"]
 	# hosts=["h4","h5","h1","h2","h3","h6"]
-	hosts=["h5","h1","h2","h3","h4","h6"]
+	# hosts=["h5","h1","h2","h3","h4","h6"]
 	# hosts=["h1","h2","h3","h4","h5","h6","h7","h8"]
 	# hosts=["h4","h5","h6","h7","h8","h1","h2","h3"]
 	# hosts=["h1","h2","h3","h4","h5","h6","h7"]
@@ -154,7 +154,7 @@ def startNetwork():
 	# hosts=["h5","h7","h4","h3","h1","h6","h2","h8"]
 	# hosts=["h5","h7","h4","h3","h1","h6","h2","h8","h9","h11"]
 	# hosts=["h5","h11","h7","h4","h9","h3","h1","h6","h2","h8"]
-	# hosts=["h4","h3","h2","h5","h9","h1","h7","h6","h8"]
+	hosts=["h4","h3","h2","h5","h9","h1","h7","h6","h8"]
 
 	info(f'[INFO]*********Test Yayını Başlatıldı********\n')
 	selectServer(hosts)
@@ -239,6 +239,7 @@ def selectServer(receivers):
 				senderCommand2=senderCommand2+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
 			sleep(23)
 			senderThread2.join()
+			senderThread1.join()
 			
 		num_paths=3
 		path_index=0
