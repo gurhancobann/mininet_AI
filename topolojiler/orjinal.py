@@ -12,6 +12,7 @@ from mininet.link import TCLink
 from mininet.util import pmonitor
 from time import sleep, perf_counter
 import datetime
+import pickle
 
 import json
 from multiprocessing import Pool
@@ -60,9 +61,9 @@ class NsfnetTopo(Topo):
 		s13=self.addSwitch('s13',dpid='00:00:00:00:00:00:00:13',protocols="OpenFlow13")
 		s14=self.addSwitch('s14',dpid='00:00:00:00:00:00:00:14',protocols="OpenFlow13")
 		global bandWidth
-		bandWidth=10
-		linkOptns1=dict(delay='25ms',bw=bandWidth, loss=1, max_queue_size=1000, use_htb=True,cls=TCLink)
-		linkOptns2=dict(delay='25ms',bw=bandWidth, loss=1, max_queue_size=1000, use_htb=True,cls=TCLink)
+		bandWidth=3
+		linkOptns1=dict(delay='25ms',bw=bandWidth, loss=0, max_queue_size=1000, use_htb=True,cls=TCLink)
+		linkOptns2=dict(delay='25ms',bw=bandWidth, loss=0, max_queue_size=1000, use_htb=True,cls=TCLink)
 	
 		self.addLink(s1, s2, **linkOptns2)
 		self.addLink(s1, s3, **linkOptns2)
@@ -108,7 +109,7 @@ def startNetwork():
 	serverList={}
 	activeThreadList=[]
 	net=None
-	dataFrame=pd.read_csv('dataTest.csv')
+	dataFrame=pd.read_csv('dataOriginal.csv')
 	global data
 	data={}
 	dataRow={}
@@ -159,8 +160,10 @@ def startNetwork():
 	info(f'[INFO]*********Test Yayını Başlatıldı********\n')
 	selectServer(hosts)
 	print(json.dumps(serverList,indent=4))
-	killFfmegPorts("h10")
-	killFfmegPorts("h14")
+	sleep(10)
+	for host in hosts:
+		killFfmegPorts(serverList[host])
+
 	info(f'[INFO]********Test Bitti - Aktif thread sayısı : {threading.active_count()}*******\n')
 	info(f'[INFO]********ASıl İşlem *******\n')
 	sleep(10)
@@ -175,10 +178,10 @@ def startNetwork():
 	info(f'[INFO]********PSNR & SSIM Değerleri Hesaplanıyor*******\n')
 	for host in hosts:
 		psnr, ssim_first, ssim_second=calcPsnrSsim(host)
-		dataRow={"host":host,"avgRTT":data[f'{host}avgRTT'],"packetLoss":data[f'{host}packetLoss'],"latency":data[f'{host}latency'],"hopCount":data[f'{host}hopCount'],"bandwidth":bandWidth*1000000,"yukOrani":data[f'{host}yukOrani'],"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"type":3,"server":serverList[host]}
+		dataRow={"host":host,"avgRTT":data[f'{host}avgRTT'],"latency":data[f'{host}latency'],"hopCount":data[f'{host}hopCount'],"bandwidth":bandWidth*1000000,"yukOrani":data[f'{host}yukOrani'],"predict_ssim":data[f'{host}predict_ssim'],"target_ssim":ssim_first,"server":serverList[host]}
 		dataFrame=dataFrame.append(dataRow,ignore_index=True)
 	
-	dataFrame.to_csv("dataTest.csv",sep=",",index=False,encoding="utf-8")
+	dataFrame.to_csv("dataOriginal.csv",sep=",",index=False,encoding="utf-8")
 	
 	try:
 		deletefile()
@@ -197,62 +200,155 @@ def selectServer(receivers):
 	senderCommand1=f"ffmpeg -re -t 15 -i {videoSource}"
 	senderCommand2=f"ffmpeg -re -t 15 -i {videoSource}"
 	hosts=[]
-	h10Toplam=0
-	h14Toplam=0
 	for receiver in receivers:
-		yukOrani=0
+		num_paths=3
+		path_index=0
+		hosts.append(receiver)
 		receiverNode=net.getNodeByName(receiver)
 		dst_host_ipv4=receiverNode.IP()
 		dst_host_mac=receiverNode.MAC()
-		hosts.append(receiver)
-		if(len(serverList)==0):
-			print("serverList Boş")
-			sleep(3)
-			h10gelen,h14gelen,yukOrani=testHostFloodlight(receiver,h10Toplam,h14Toplam)
-			if(serverList[receiver]=="h10"):
-				senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
-			if(serverList[receiver]=="h14"):
-				senderCommand2=senderCommand2+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+		src_host_mac=net.getNodeByName("h10").MAC()
+		src_host_ipv4=net.getNodeByName("h10").IP()
+		latencyh10,hopCounth10,lowBandwidthh10,pathh10=floodlightRestApi.getValue(src_host_mac, src_host_ipv4, dst_host_mac,dst_host_ipv4,num_paths,path_index)
+		src_host_mac=net.getNodeByName("h14").MAC()
+		src_host_ipv4=net.getNodeByName("h14").IP()
+		latencyh14,hopCounth14,lowBandwidthh14,pathh14=floodlightRestApi.getValue(src_host_mac, src_host_ipv4, dst_host_mac,dst_host_ipv4,num_paths,path_index)
+		yukOranih10,yukOranih14=yukOraniHesapla(receiver)
+		lowBandwidthh10=bandWidth*1000000
+		lowBandwidthh14=bandWidth*1000000
+		#h10 için test
+		for host in hosts:
+			print(host)
+			receiverURL=f"udp://{net.getNodeByName(host).IP()}:{port}"
+			receiverCommand=f"ffmpeg -timeout 30000 -i {receiverURL}"
+			receiverThread=(HostCommand(net.getNodeByName(host), receiverCommand))
+			receiverThread.daemon=True
+			receiverThread.start()
+		senderNode1=net.getNodeByName("h10")
+		senderNode2=net.getNodeByName("h14")
+		senderCommand1=senderCommand1+" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+		senderThread1=(HostCommand(senderNode1, senderCommand1))
+		senderThread1.daemon=True
+		senderThread1.start()
+		senderThread2=(HostCommand(senderNode2, senderCommand2))
+		senderThread2.daemon=True
+		senderThread2.start()
+		avgRTTh10, packetLossh10 = getPingStats(receiver, "h10")
+		sleep(30)
+		senderThread2.join()
+		senderThread1.join()
+		#h14 için test
+		for host in hosts:
+			print(host)
+			receiverURL=f"udp://{net.getNodeByName(host).IP()}:{port}"
+			receiverCommand=f"ffmpeg -timeout 30000 -i {receiverURL}"
+			receiverThread=(HostCommand(net.getNodeByName(host), receiverCommand))
+			receiverThread.daemon=True
+			receiverThread.start()
+		senderNode1=net.getNodeByName("h10")
+		senderNode2=net.getNodeByName("h14")
+		senderCommand2=senderCommand2+" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+		senderThread1=(HostCommand(senderNode1, senderCommand1))
+		senderThread1.daemon=True
+		senderThread1.start()
+		senderThread2=(HostCommand(senderNode2, senderCommand2))
+		senderThread2.daemon=True
+		senderThread2.start()
+		avgRTTh14, packetLossh14 = getPingStats(receiver, "h14")
+		sleep(30)
+		senderThread2.join()
+		senderThread1.join()
+		print(f'{receiver} => h10 avgRTT => {avgRTTh10}, latency => {latencyh10}, hopCount => {hopCounth10}, bandwidth => {lowBandwidthh10}, yukOrani =>{yukOranih10}')
+		print(f'{receiver} => h14 avgRTT => {avgRTTh14}, latency => {latencyh14}, hopCount => {hopCounth14}, bandwidth => {lowBandwidthh14}, yukOrani =>{yukOranih14}')
+		ssimh10=yukHesapla(avgRTTh10,latencyh10,hopCounth10,lowBandwidthh10,yukOranih10)
+		ssimh14=yukHesapla(avgRTTh14,latencyh14,hopCounth14,lowBandwidthh14,yukOranih14)
+		print(f'h10 için psnr:{ssimh10}')
+		print(f'h14 için psnr:{ssimh14}')
+		if(ssimh10<ssimh14):
+			serverList[receiver]="h14"
+			data[f'{receiver}avgRTT']=avgRTTh14
+			data[f'{receiver}latency']=latencyh14
+			data[f'{receiver}hopCount']=hopCounth14
+			data[f'{receiver}yukOrani']=yukOranih14
+			data[f'{receiver}predict_ssim']=ssimh14
+			floodlightRestApi.pushPath(net.getNodeByName("h14").IP(),net.getNodeByName(receiver).IP(),pathh14)
+			print("h14")
 		else:
-			print("serverList Boşdeğil")
-			sleep(3)
-			for host in hosts:
-				print(host)
-				receiverURL=f"udp://{net.getNodeByName(host).IP()}:{port}"
-				receiverCommand=f"ffmpeg -timeout 5000 -i {receiverURL}"
-				receiverThread=(HostCommand(net.getNodeByName(host), receiverCommand))
-				receiverThread.daemon=True
-				receiverThread.start()
-			senderNode1=net.getNodeByName("h10")
-			senderNode2=net.getNodeByName("h14")
-			senderThread1=(HostCommand(senderNode1, senderCommand1))
-			senderThread1.daemon=True
-			senderThread1.start()
-			senderThread2=(HostCommand(senderNode2, senderCommand2))
-			senderThread2.daemon=True
-			senderThread2.start()
-			sleep(5)
-			h10gelen,h14gelen,yukOrani=testHostFloodlight(receiver,h10Toplam,h14Toplam)
-			if(serverList[receiver]=="h10"):
-				senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
-			if(serverList[receiver]=="h14"):
-				senderCommand2=senderCommand2+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
-			sleep(23)
-			senderThread2.join()
-			senderThread1.join()
-			
-		num_paths=3
-		path_index=0
-		src_host_mac=net.getNodeByName(serverList[receiver]).MAC()
-		src_host_ipv4=net.getNodeByName(serverList[receiver]).IP()
-		data[f"{receiver}latency"],data[f"{receiver}hopCount"],data[f"{receiver}lowBandwidth"]=floodlightRestApi.pathPusher(src_host_mac, src_host_ipv4, dst_host_mac,dst_host_ipv4,num_paths,path_index)
-		# test=netStatistic(serverList[receiver],receiver,0)
-		sleep(3)
-		info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
-		data[f'{receiver}yukOrani']=yukOrani
-		h10Toplam=h10Toplam+h10gelen
-		h14Toplam=h14Toplam+h14gelen
+			serverList[receiver]="h10"
+			data[f'{receiver}avgRTT']=avgRTTh10
+			data[f'{receiver}latency']=latencyh10
+			data[f'{receiver}hopCount']=hopCounth10
+			data[f'{receiver}yukOrani']=yukOranih10
+			data[f'{receiver}predict_ssim']=ssimh10
+			floodlightRestApi.pushPath(net.getNodeByName("h10").IP(),net.getNodeByName(receiver).IP(),pathh10)
+			print("h10")
+	# -------------------------------------------------------
+	# for receiver in receivers:
+	# 	yukOrani=0
+	# 	receiverNode=net.getNodeByName(receiver)
+	# 	dst_host_ipv4=receiverNode.IP()
+	# 	dst_host_mac=receiverNode.MAC()
+	# 	hosts.append(receiver)
+	# 	h10gelen,h14gelen,yukOrani=testHostFloodlight(receiver,h10Toplam,h14Toplam)
+		
+        
+		
 
+    
+	# 	if(len(serverList)==0):
+	# 		print("serverList Boş")
+	# 		sleep(3)
+	# 		h10gelen,h14gelen,yukOrani=testHostFloodlight(receiver,h10Toplam,h14Toplam)
+	# 		if(serverList[receiver]=="h10"):
+	# 			senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+	# 		if(serverList[receiver]=="h14"):
+	# 			senderCommand2=senderCommand2+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+	# 	else:
+	# 		print("serverList Boşdeğil")
+	# 		sleep(3)
+	# 		for host in hosts:
+	# 			print(host)
+	# 			receiverURL=f"udp://{net.getNodeByName(host).IP()}:{port}"
+	# 			receiverCommand=f"ffmpeg -timeout 5000 -i {receiverURL}"
+	# 			receiverThread=(HostCommand(net.getNodeByName(host), receiverCommand))
+	# 			receiverThread.daemon=True
+	# 			receiverThread.start()
+	# 		senderNode1=net.getNodeByName("h10")
+	# 		senderNode2=net.getNodeByName("h14")
+	# 		senderThread1=(HostCommand(senderNode1, senderCommand1))
+	# 		senderThread1.daemon=True
+	# 		senderThread1.start()
+	# 		senderThread2=(HostCommand(senderNode2, senderCommand2))
+	# 		senderThread2.daemon=True
+	# 		senderThread2.start()
+	# 		sleep(5)
+	# 		h10gelen,h14gelen,yukOrani=testHostFloodlight(receiver,h10Toplam,h14Toplam)
+	# 		if(serverList[receiver]=="h10"):
+	# 			senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+	# 		if(serverList[receiver]=="h14"):
+	# 			senderCommand2=senderCommand2+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+	# 		sleep(23)
+	# 		senderThread2.join()
+	# 		senderThread1.join()
+			
+	# 	num_paths=3
+	# 	path_index=0
+	# 	src_host_mac=net.getNodeByName(serverList[receiver]).MAC()
+	# 	src_host_ipv4=net.getNodeByName(serverList[receiver]).IP()
+	# 	data[f"{receiver}latency"],data[f"{receiver}hopCount"],data[f"{receiver}lowBandwidth"]=floodlightRestApi.pathPusher(src_host_mac, src_host_ipv4, dst_host_mac,dst_host_ipv4,num_paths,path_index)
+	# 	# test=netStatistic(serverList[receiver],receiver,0)
+	# 	sleep(3)
+	# 	info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
+	# 	data[f'{receiver}yukOrani']=yukOrani
+	# 	h10Toplam=h10Toplam+h10gelen
+	# 	h14Toplam=h14Toplam+h14gelen
+
+def yukHesapla(avgRTT,latency,hopCount,lowBandwidth,yukOrani):
+	with open("./model/rfrModel.pkl",'rb') as file:
+		model=pickle.load(file)
+	x=pd.DataFrame({"avgRTT":[avgRTT],"latency":[latency],"hopCount":[hopCount],"bandwidth":[lowBandwidth],"yukOrani":[yukOrani]})
+	y=model.predict(x)
+	return y[0]
 def test(receivers,serverList):
 	port="1234"
 	videoSource="test.ts"
@@ -330,13 +426,13 @@ def LoadBalacing(receivers,serverList):
 	senderThread2.start()
 	info(f'[INFO]********Video gönderim başladı*******\n')
 	sleep(10)
-	for receiver in receivers:
-		avgRTT, packetLoss = getPingStats(receiver, serverList[receiver])
-		data[f'{receiver}avgRTT'] = avgRTT
-		data[f'{receiver}packetLoss'] = packetLoss
-		print(f"""*** Average RTT: {avgRTT}\nPacket Loss: {packetLoss}""")
-		data[f'{receiver}avgRTT'] = avgRTT
-		data[f'{receiver}packetLoss'] = packetLoss
+	# for receiver in receivers:
+	# 	avgRTT, packetLoss = getPingStats(receiver, serverList[receiver])
+	# 	data[f'{receiver}avgRTT'] = avgRTT
+	# 	data[f'{receiver}packetLoss'] = packetLoss
+	# 	print(f"""*** Average RTT: {avgRTT}\nPacket Loss: {packetLoss}""")
+	# 	data[f'{receiver}avgRTT'] = avgRTT
+	# 	data[f'{receiver}packetLoss'] = packetLoss
 	senderThread2.join()
 	senderThread1.join()
 	info(f'[INFO]********Video gönderim bitti*******\n')
@@ -374,6 +470,13 @@ def testH6():
 	dst_host_mac=receiverNode.MAC()
 	floodlightRestApi.pathPusher(src_host_mac, src_host_ipv4, dst_host_mac,dst_host_ipv4,num_paths,path_index)
 
+def yukOraniHesapla(host):
+	h10_alinan_bytes,h10_iletilen_bytes,h10_sure=floodlightRestApi.getStats(net.getNodeByName("h10").IP())
+	h14_alinan_bytes,h14_iletilen_bytes,h14_sure=floodlightRestApi.getStats(net.getNodeByName("h14").IP())
+	yukh10=(h10_alinan_bytes+h10_iletilen_bytes)/h10_sure
+	yukh14=(h14_alinan_bytes+h14_iletilen_bytes)/h14_sure
+	return yukh10,yukh14
+
 def testHostFloodlight(receiver,h10,h14):
 	print(f"h10 önceki :{h10}, h14 önceki :{h14}")
 	print(f"testHost {receiver} için Başladı")
@@ -405,7 +508,7 @@ def testHostFloodlight(receiver,h10,h14):
 def getPingStats(receiver: str, sender: str) -> [float, float]:
 	senderNode, receiverNode = net.getNodeByName(sender), net.getNodeByName(receiver)
 	receiverIpv4 = receiverNode.IP()
-	print("Receiver ipv4 -> ", receiverIpv4)
+	print("Receiver ipv4 -> ", receiverIpv4," Sender ipv4 ->",senderNode.IP())
 	packetCount = "9"
 	command = f"ping {receiverIpv4} -c {packetCount} -f"
 	result = senderNode.popen(command)

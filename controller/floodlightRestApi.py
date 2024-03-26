@@ -134,6 +134,69 @@ def pathPusher(src_host_mac:str, src_host_ipv4:str, dst_host_mac:str, dst_host_i
         flowPusher(first_direction)
         flowPusher(second_direction)
     return latency,hop_count,lowBandwidth
+
+def getValue(src_host_mac:str, src_host_ipv4:str, dst_host_mac:str, dst_host_ipv4:str, num_paths:int, path_index:int):
+    src_switch_dpid, src_switch_port = getSwitchAndPortByHost(src_host_mac)
+    dst_switch_dpid, dst_switch_port = getSwitchAndPortByHost(dst_host_mac)
+
+    path, latency, hop_count = getPathById(src_switch_dpid, dst_switch_dpid, num_paths, path_index)
+
+    #print(f"Hop Count: {hop_count}\nLatency: {latency}\nPath: {path}")
+    path.insert(0,{'dpid': src_switch_dpid, 'port': str(src_switch_port)})
+    path.append({'dpid': dst_switch_dpid, 'port': str(dst_switch_port)})
+
+    # print(f"Hop Count: {hop_count}\nLatency: {latency}\nPath: {path}")
+    lowBandwidth=-1
+    for i in range(0,len(path), 2):
+        switch_dpid = path[i]["dpid"]
+        siwtch_input_port = path[i]["port"]
+
+        if(lowBandwidth==-1):
+            lowBandwidth=int(getStatsBandwidth(switch_dpid,siwtch_input_port))
+        elif(lowBandwidth>int(getStatsBandwidth(switch_dpid,siwtch_input_port))):
+            lowBandwidth=int(getStatsBandwidth(switch_dpid,siwtch_input_port))
+
+    return latency,hop_count,lowBandwidth,path
+
+def pushPath(src_host_ipv4:str, dst_host_ipv4:str,path):
+
+    for i in range(0,len(path), 2):
+        switch_dpid = path[i]["dpid"]
+        siwtch_input_port = path[i]["port"]
+        siwtch_output_port = path[i+1]["port"]
+        flow_first_direction_name = f"flow_{switch_dpid}_{siwtch_input_port}_1"
+        flow_second_direction_name = f"flow_{switch_dpid}_{siwtch_output_port}_2"
+
+        # print("******** switch dpid: ", switch_dpid, " switch input port: ", siwtch_input_port, " switch output port: ", siwtch_output_port)
+        
+        first_direction = {
+        "switch": switch_dpid,
+        "name": flow_first_direction_name,
+        "cookie": "0",
+        "priority":"32768",
+        "eth_type" : "0x0800" ,
+        "ipv4_src": src_host_ipv4,
+        "ipv4_dst": dst_host_ipv4,
+        "in_port": siwtch_input_port,
+        "active":"true",
+        "actions": f"output={siwtch_output_port}"
+        }
+
+        second_direction = {
+        "switch": switch_dpid,
+        "name": flow_second_direction_name,
+        "cookie": "0",
+        "priority":"32768",
+        "eth_type" : "0x0800" ,
+        "ipv4_src": dst_host_ipv4,
+        "ipv4_dst": src_host_ipv4,
+        "in_port": siwtch_output_port,
+        "active":"true",
+        "actions": f"output={siwtch_input_port}"
+        }
+        flowPusher(first_direction)
+        flowPusher(second_direction)
+
 def deleteAllFlows():
     url = f"http://127.0.0.1:8080/wm/staticentrypusher/clear/all/json"
     response = requests.get(url)
