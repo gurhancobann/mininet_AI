@@ -132,7 +132,8 @@ def startNetwork():
 	floodlightRestApi.deleteAllFlows()
 	info(f'[INFO]**********Tüm Akışlar Silindi**********\n')
 
-	#net.pingAll()
+	#net.pingAll() 
+	#d
 	
 	
 	hosts=["h12","h13","h1","h2","h3","h4","h5","h7","h8","h9","h11","h6"]
