@@ -98,10 +98,10 @@ def pathPusher(src_host_mac:str, src_host_ipv4:str, dst_host_mac:str, dst_host_i
         flow_first_direction_name = f"flow_{switch_dpid}_{siwtch_input_port}_1"
         flow_second_direction_name = f"flow_{switch_dpid}_{siwtch_output_port}_2"
 
-        if(lowBandwidth==-1):
-            lowBandwidth=int(getStatsBandwidth(switch_dpid,siwtch_input_port))
-        elif(lowBandwidth>int(getStatsBandwidth(switch_dpid,siwtch_input_port))):
-            lowBandwidth=int(getStatsBandwidth(switch_dpid,siwtch_input_port))
+        # if(lowBandwidth==-1):
+        #     lowBandwidth=int(getStatsBandwidth(switch_dpid,siwtch_input_port))
+        # elif(lowBandwidth>int(getStatsBandwidth(switch_dpid,siwtch_input_port))):
+        #     lowBandwidth=int(getStatsBandwidth(switch_dpid,siwtch_input_port))
 
         print("******** switch dpid: ", switch_dpid, " switch input port: ", siwtch_input_port, " switch output port: ", siwtch_output_port)
         

@@ -61,8 +61,8 @@ class NsfnetTopo(Topo):
 		s14=self.addSwitch('s14',dpid='00:00:00:00:00:00:00:14',protocols="OpenFlow13")
 		global bandWidth
 		bandWidth=10
-		linkOptns1=dict(delay='25ms',bw=bandWidth, loss=1, max_queue_size=1000, use_htb=True,cls=TCLink)
-		linkOptns2=dict(delay='25ms',bw=bandWidth, loss=1, max_queue_size=1000, use_htb=True,cls=TCLink)
+		linkOptns1=dict(delay='25ms',bw=bandWidth, loss=0, max_queue_size=1000, use_htb=True,cls=TCLink)
+		linkOptns2=dict(delay='25ms',bw=bandWidth, loss=0, max_queue_size=1000, use_htb=True,cls=TCLink)
 	
 		self.addLink(s1, s2, **linkOptns2)
 		self.addLink(s1, s3, **linkOptns2)
@@ -108,7 +108,7 @@ def startNetwork():
 	serverList={}
 	activeThreadList=[]
 	net=None
-	dataFrame=pd.read_csv('dataTest.csv')
+	dataFrame=pd.read_csv('dataTest23.06.2024.csv')
 	global data
 	data={}
 	dataRow={}
@@ -154,7 +154,9 @@ def startNetwork():
 	# hosts=["h5","h7","h4","h3","h1","h6","h2","h8"]
 	# hosts=["h5","h7","h4","h3","h1","h6","h2","h8","h9","h11"]
 	# hosts=["h5","h11","h7","h4","h9","h3","h1","h6","h2","h8"]
-	hosts=["h4","h3","h2","h5","h9","h1","h7","h6","h8"]
+	#hosts=["h4","h3","h2","h5","h9","h1","h7","h6","h8"]
+	# hosts=["h1","h2","h3","h4","h5","h6","h7","h8","h9","h11","h12","h13"]
+	hosts=["h1","h7","h8","h9","h11","h12","h13","h6","h5","h4","h3","h2"]
 
 	info(f'[INFO]*********Test Yayını Başlatıldı********\n')
 	selectServer(hosts)
@@ -175,10 +177,10 @@ def startNetwork():
 	info(f'[INFO]********PSNR & SSIM Değerleri Hesaplanıyor*******\n')
 	for host in hosts:
 		psnr, ssim_first, ssim_second=calcPsnrSsim(host)
-		dataRow={"host":host,"avgRTT":data[f'{host}avgRTT'],"packetLoss":data[f'{host}packetLoss'],"latency":data[f'{host}latency'],"hopCount":data[f'{host}hopCount'],"bandwidth":bandWidth*1000000,"yukOrani":data[f'{host}yukOrani'],"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"type":3,"server":serverList[host]}
+		dataRow={"host":host,"avgRTT":data[f'{host}avgRTT'],"packetLoss":data[f'{host}packetLoss'],"latency":data[f'{host}latency'],"hopCount":data[f'{host}hopCount'],"bandwidth":bandWidth*1000000,"yukOrani":data[f'{host}yukOrani'],"gelenPaket":data[f'{host}gelenPaket'],"gidenPaket":data[f'{host}gidenPaket'],"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"type":3,"server":serverList[host]}
 		dataFrame=dataFrame.append(dataRow,ignore_index=True)
 	
-	dataFrame.to_csv("dataTest.csv",sep=",",index=False,encoding="utf-8")
+	dataFrame.to_csv("dataTest23.06.2024.csv",sep=",",index=False,encoding="utf-8")
 	
 	try:
 		deletefile()
@@ -191,7 +193,7 @@ def startNetwork():
 
 def selectServer(receivers):
 	port="1234"
-	videoSource="test.ts"
+	videoSource="outputOrjinal.ts"
 	num_paths=3
 	path_index=0
 	senderCommand1=f"ffmpeg -re -t 15 -i {videoSource}"
@@ -208,7 +210,7 @@ def selectServer(receivers):
 		if(len(serverList)==0):
 			print("serverList Boş")
 			sleep(3)
-			h10gelen,h14gelen,yukOrani=testHostFloodlight(receiver,h10Toplam,h14Toplam)
+			h10gelen,h14gelen,yukOrani,gelenPaket,gidenPaket=testHostFloodlight(receiver,h10Toplam,h14Toplam)
 			if(serverList[receiver]=="h10"):
 				senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
 			if(serverList[receiver]=="h14"):
@@ -232,7 +234,7 @@ def selectServer(receivers):
 			senderThread2.daemon=True
 			senderThread2.start()
 			sleep(5)
-			h10gelen,h14gelen,yukOrani=testHostFloodlight(receiver,h10Toplam,h14Toplam)
+			h10gelen,h14gelen,yukOrani,gelenPaket,gidenPaket=testHostFloodlight(receiver,h10Toplam,h14Toplam)
 			if(serverList[receiver]=="h10"):
 				senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
 			if(serverList[receiver]=="h14"):
@@ -250,6 +252,8 @@ def selectServer(receivers):
 		sleep(3)
 		info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
 		data[f'{receiver}yukOrani']=yukOrani
+		data[f'{receiver}gelenPaket']=gelenPaket
+		data[f'{receiver}gidenPaket']=gidenPaket
 		h10Toplam=h10Toplam+h10gelen
 		h14Toplam=h14Toplam+h14gelen
 
@@ -303,7 +307,7 @@ def test(receivers,serverList):
 def LoadBalacing(receivers,serverList):
 	ping=[]
 	port="1234"
-	videoSource="output.ts"
+	videoSource="outputOrjinal.ts"
 	senderNode1, senderNode2=net.getNodeByName("h10"), net.getNodeByName("h14")
 	senderCommand1=f"ffmpeg -re -i {videoSource}"
 	senderCommand2=f"ffmpeg -re -i {videoSource}"
@@ -395,12 +399,16 @@ def testHostFloodlight(receiver,h10,h14):
 		yuk2=(h14_alinan_bytes+h14_iletilen_bytes)/h14_sure
 		if (yuk1 <= yuk2):
 			serverList[receiver]="h10"
+			gelenPaket=h10_alinan_bytes
+			gidenPaket=h10_iletilen_bytes
 			yukOrani=yuk1
 		else:
 			serverList[receiver]="h14"
+			gelenPaket=h14_alinan_bytes
+			gidenPaket=h14_iletilen_bytes
 			yukOrani=yuk2
 	print(json.dumps(serverList,indent=4))
-	return (h10_alinan_bytes+h10_iletilen_bytes),(h14_alinan_bytes+h14_iletilen_bytes),yukOrani
+	return (h10_alinan_bytes+h10_iletilen_bytes),(h14_alinan_bytes+h14_iletilen_bytes),yukOrani,gelenPaket,gidenPaket
 
 def getPingStats(receiver: str, sender: str) -> [float, float]:
 	senderNode, receiverNode = net.getNodeByName(sender), net.getNodeByName(receiver)
@@ -495,7 +503,7 @@ def killFfmegPorts(senderNode):
 def calcPsnrSsim(receiver):
 	host=net.getNodeByName(receiver)
 	print(f"***********{host} için PSNR ve SSİM değerleri hesaplanıyor******")
-	videoSource="output.ts"
+	videoSource="outputOrjinal.ts"
 	outputSource=f"records/{host}/input.ts"
 	command=f"ffmpeg -i {videoSource} -i {outputSource} -lavfi '[0:v][1:v]psnr' -f null -"
 	hostThread=HostCommand(host, command)

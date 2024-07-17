@@ -10,6 +10,8 @@ from mininet.node import RemoteController, OVSKernelSwitch, Host, CPULimitedHost
 from mininet.topo import Topo
 from mininet.link import TCLink
 from time import sleep, perf_counter
+import datetime
+import os
 
 import json
 from multiprocessing import Pool
@@ -19,6 +21,7 @@ from threading import Thread
 import floodlightRestApi
 import subprocess
 import pandas as pd
+
 
 class NsfnetTopo(Topo):
 	"""
@@ -56,9 +59,10 @@ class NsfnetTopo(Topo):
 		s12=self.addSwitch('s12',dpid='00:00:00:00:00:00:00:12',protocols="OpenFlow13")
 		s13=self.addSwitch('s13',dpid='00:00:00:00:00:00:00:13',protocols="OpenFlow13")
 		s14=self.addSwitch('s14',dpid='00:00:00:00:00:00:00:14',protocols="OpenFlow13")
-		
-		linkOptns1=dict(delay='25ms',bw=10, loss=0, max_queue_size=1000, use_htb=True)
-		linkOptns2=dict(delay='25ms',bw=10, loss=0, max_queue_size=1000, use_htb=True)
+		global bandWidth
+		bandWidth=10
+		linkOptns1=dict(delay='25ms',bw=bandWidth, loss=0, max_queue_size=1000, use_htb=True)
+		linkOptns2=dict(delay='25ms',bw=bandWidth, loss=0, max_queue_size=1000, use_htb=True)
 	
 		self.addLink(s1, s2, **linkOptns2)
 		self.addLink(s1, s3, **linkOptns2)
@@ -102,7 +106,12 @@ def startNetwork():
 	global activeThreadList
 	activeThreadList=[]
 	net=None
-	dataFrame=pd.read_csv('data.csv')
+	dosya="data16072024.csv"
+	global videoSource
+	videoSource="outputOrjinal.ts"
+	dataFrame=pd.read_csv(dosya)
+	global data
+	data={}
 	dataRow={}
 	cleanMininet()
 
@@ -117,10 +126,11 @@ def startNetwork():
 	net.start()
 	info(f'[INFO]*************2sn Bekleniyor************\n')
 	sleep(2)
+	
+	#net.pingAll()
 	floodlightRestApi.deleteAllFlows()
 	info(f'[INFO]**********Tüm Akışlar Silindi**********\n')
 
-	#net.pingAll()
 	
 	
 
@@ -128,32 +138,37 @@ def startNetwork():
 	# wireThread.daemon=True
 	# wireThread.start()
 	serverName="h14"
+	hosts=["h1","h2","h3","h4","h5","h7","h8","h9","h11","h12","h13","h6"]
 	info(f'[INFO]*********Test Yayını Başlatıldı********\n')
-	testVideo(serverName)
+	testVideo(hosts,serverName)
 	info(f'[INFO]**********Test Yayını Alınıyor*********\n')
-	receiveTest(["h1","h2","h3","h4","h5"],serverName)
+	receiveTest(hosts,serverName)
 	info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
-	info(f'[INFO]********Testin Bitmesi Bekleniyor*******\n')
-	sleep(16)
+	info(f'{datetime.datetime.now()} [INFO]********Testin Bitmesi Bekleniyor*******\n')
+	sleep(40)
 	killFfmegPorts(serverName)
 	info(f'[INFO]********Test Bitti - Aktif thread sayısı : {threading.active_count()}*******\n')
-	info(f'[INFO]********ASıl İşlem *******\n')
-	receiveVideo(["h1","h2","h3","h4","h5","h6"],serverName)
-	sendVideo(serverName)
-	sleep(10)
+	info(f'{datetime.datetime.now()} [INFO]********ASıl İşlem *******\n')
+	receiveVideo(hosts,serverName)
+	sendVideo(hosts,serverName)
+	sleep(40)
 	# activeThreadList=threading.enumerate()
 	# activeThreadList.pop(0)
 	killFfmegPorts(serverName)
 	print(activeThreadList)
 	#activeThreadList[len(activeThreadList)-1].join()
-	info(f'[INFO]********Video bitti*******\n')
+	info(f'{datetime.datetime.now()} [INFO]********Video bitti*******\n')
 	info(f'[INFO]********PSNR & SSIM Değerleri Hesaplanıyor*******\n')
-	for host in ["h1","h2","h3","h4","h5","h6"]:
+	for host in hosts:
 		psnr, ssim_first, ssim_second=calcPsnrSsim(host)
-		dataRow={"host":host,"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"type":1,"server":serverName}
+		kayit=f"records/{host}/input.ts"
+		boyutana=os.stat(videoSource).st_size
+		boyutkayit=os.stat(kayit).st_size
+		dataRow={"host":host,"avgRTT":data[f'{host}avgRTT'],"packetLoss":data[f'{host}packetLoss'],"latency":data[f'{host}latency'],"hopCount":data[f'{host}hopCount'],"bandwidth":bandWidth*1000000,"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"kaynak":boyutana,"kayitboyut":boyutkayit,"kayip":(boyutana-boyutkayit),"kayip_orani":(((boyutana-boyutkayit)/boyutana)*100),"type":1,"server":serverName}
+		#dataRow={"host":host,"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"kaynak":boyutana,"kayitboyut":boyutkayit,"kayip":(boyutana-boyutkayit),"kayip_orani":(((boyutana-boyutkayit)/boyutana)*100),"type":1,"server":serverName}
 		dataFrame=dataFrame.append(dataRow,ignore_index=True)
 	
-	dataFrame.to_csv("data.csv",sep=",",index=False,encoding="utf-8")
+	dataFrame.to_csv(dosya,sep=",",index=False,encoding="utf-8")
 	
 	try:
 		deletefile()
@@ -177,9 +192,7 @@ def receiveTest(receivers,sender):
 		num_paths=3
 		path_index=0
 		receiverURL=f"udp://{dst_host_ıpv4}:{port}"
-		#receiverCommand=f"ffplay -i {receiverURL}"
-		#receiverCommand=f"ffmpeg -i {receiverURL} -c copy records/{receiver}/input.ts"
-		floodlightRestApi.pathPusher(src_host_mac, src_host_ipv4, dst_host_mac,dst_host_ıpv4,num_paths,path_index)
+		data[f"{receiver}latency"],data[f"{receiver}hopCount"],data[f"{receiver}lowBandwidth"]=floodlightRestApi.pathPusher(src_host_mac, src_host_ipv4, dst_host_mac,dst_host_ıpv4,num_paths,path_index)
 		receiverCommand=f"ffmpeg -i {receiverURL}"
 		receiverThread=(HostCommand(receiverNode, receiverCommand))
 		receiverThread.daemon=True
@@ -193,7 +206,7 @@ def receiveVideo(receivers,sender):
 	for receiver in receivers:
 		receiverNode=net.getNodeByName(receiver)
 		if i==len(receivers)-1:
-			floodlightRestApi.pathPusher(senderNode.MAC(), senderNode.IP(), receiverNode.MAC(),receiverNode.IP(),3,0)
+			data[f"{receiver}latency"],data[f"{receiver}hopCount"],data[f"{receiver}lowBandwidth"]=floodlightRestApi.pathPusher(senderNode.MAC(), senderNode.IP(), receiverNode.MAC(),receiverNode.IP(),3,0)
 		print("receiver: "+receiver)
 		print(receiverNode.IP())
 		receiverURL=f"udp://{receiverNode.IP()}:{port}"
@@ -206,24 +219,42 @@ def receiveVideo(receivers,sender):
 		receiverThread.daemon=True
 		receiverThread.start()
 		i=i+1
-def testVideo(sender):
-	videoSource="test.ts"
+def testVideo(hosts,sender):
+	videoSourceTest="test.ts"
 	port="1234"
 	senderNode=net.getNodeByName(sender)
-	senderCommand=f"ffmpeg -re -i {videoSource} -c copy -f mpegts udp://10.0.0.1:1234 -c copy -f mpegts udp://10.0.0.2:1234 -c copy -f mpegts udp://10.0.0.3:1234 -c copy -f mpegts udp://10.0.0.4:1234 -c copy -f mpegts udp://10.0.0.5:1234 -c copy -f mpegts udp://10.0.0.6:1234"
+	senderCommand=f"ffmpeg -re -i {videoSourceTest}"
+	for host in hosts:
+		receiverNode=net.getNodeByName(host)
+		dst_host_ipv4=receiverNode.IP()
+		senderCommand=senderCommand+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
 	senderThread=(HostCommand(senderNode, senderCommand))
 	senderThread.daemon=True
 	senderThread.start()
 	print("*************Test Start*************")
-def sendVideo(sender):
-	videoSource="output.ts"
+def sendVideo(hosts,sender):
+	
 	port="1234"
 	senderNode=net.getNodeByName(sender)
-	senderCommand=f"ffmpeg -re -i {videoSource} -c copy -f mpegts udp://10.0.0.1:1234 -c copy -f mpegts udp://10.0.0.2:1234 -c copy -f mpegts udp://10.0.0.3:1234 -c copy -f mpegts udp://10.0.0.4:1234 -c copy -f mpegts udp://10.0.0.5:1234 -c copy -f mpegts udp://10.0.0.6:1234"
+	senderCommand=f"ffmpeg -re -i {videoSource}"
+	for host in hosts:
+		receiverNode=net.getNodeByName(host)
+		dst_host_ipv4=receiverNode.IP()
+		senderCommand=senderCommand+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+	
 	senderThread=(HostCommand(senderNode, senderCommand))
 	senderThread.daemon=True
 	senderThread.start()
-	print("sender start")
+	print(f"{datetime.datetime.now()} sender start")
+	sleep(10)
+	for receiver in hosts:
+		avgRTT, packetLoss = getPingStats(receiver, sender)
+		data[f'{receiver}avgRTT'] = avgRTT
+		data[f'{receiver}packetLoss'] = packetLoss
+		print(f"""*** Average RTT: {avgRTT}\nPacket Loss: {packetLoss}""")
+		data[f'{receiver}avgRTT'] = avgRTT
+		data[f'{receiver}packetLoss'] = packetLoss
+	print(f"{datetime.datetime.now()} sender devam ediyor")
 	senderThread.join()
 
 def killFfmegPorts(senderNode):
@@ -239,7 +270,6 @@ def killFfmegPorts(senderNode):
 def calcPsnrSsim(receiver):
 	host=net.getNodeByName(receiver)
 	print(f"***********{host} için PSNR ve SSİM değerleri hesaplanıyor******")
-	videoSource="output.ts"
 	outputSource=f"records/{host}/input.ts"
 	command=f"ffmpeg -i {videoSource} -i {outputSource} -lavfi '[0:v][1:v]psnr' -f null -"
 	hostThread=HostCommand(host, command)
@@ -267,6 +297,22 @@ def cleanMininet():
 def deletefile():
 	script_path="deleteFile.sh"
 	subprocess.run(['bash',script_path])
+
+def getPingStats(receiver: str, sender: str) -> [float, float]:
+	senderNode, receiverNode = net.getNodeByName(sender), net.getNodeByName(receiver)
+	receiverIpv4 = receiverNode.IP()
+	print("Receiver ipv4 -> ", receiverIpv4)
+	packetCount = "9"
+	command = f"ping {receiverIpv4} -c {packetCount} -f"
+	result = senderNode.popen(command)
+	sonuclar, hata=result.communicate()
+	sonuc=sonuclar.decode('utf-8')
+	print(f"{datetime.datetime.now()} -> {sonuc}")
+	ping_parser = pingparsing.PingParsing()
+	sonuc = ping_parser.parse(sonuc).as_dict()
+	packetLoss = sonuc["packet_loss_rate"]
+	avgRTT = sonuc["rtt_avg"]
+	return avgRTT, packetLoss
 
 class HostCommand(Thread):
 	def __init__(self, host:Host, command:str):
