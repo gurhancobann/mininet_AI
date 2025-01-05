@@ -1,4 +1,5 @@
 import requests
+import httplib2
 import json
 
 def flowPusher(flow:dict):
@@ -134,6 +135,17 @@ def pathPusher(src_host_mac:str, src_host_ipv4:str, dst_host_mac:str, dst_host_i
         flowPusher(first_direction)
         flowPusher(second_direction)
     return latency,hop_count,lowBandwidth
+
+def getPathInfo(src_host_mac:str, dst_host_mac:str):
+    src_switch_dpid, src_switch_port = getSwitchAndPortByHost(src_host_mac)
+    dst_switch_dpid, dst_switch_port = getSwitchAndPortByHost(dst_host_mac)
+
+    path, latency, hop_count = getPathById(src_switch_dpid, dst_switch_dpid, 3, 0)
+
+    print(f"Hop Count: {hop_count}\nLatency: {latency}\nPath: {path}")
+    
+    return latency,hop_count
+
 
 def getValue(src_host_mac:str, src_host_ipv4:str, dst_host_mac:str, dst_host_ipv4:str, num_paths:int, path_index:int):
     src_switch_dpid, src_switch_port = getSwitchAndPortByHost(src_host_mac)
@@ -272,6 +284,21 @@ def getStatsBandwidth(switch,port):
     response_json = response.json()
     print(response_json[0]["link-speed-bits-per-second"])
     return response_json[0]["link-speed-bits-per-second"]
+
+def addACL(srcIP, destIP,action):
+    url_post = "http://127.0.0.1:8080/wm/acl/rules/json"
+    srcIP=srcIP+"/32"
+    destIP=destIP+"/32"
+    json = {"src-ip":srcIP,
+            "dst-ip":destIP,
+            "action":action}
+    post_response = requests.post(url_post, json=json)
+    post_response_json = post_response.json()
+    print(post_response_json)
+
+def clearACL():
+    url = "http://127.0.0.1:8080/wm/acl/clear/json"
+    response = requests.get(url)
 
 if __name__ == "__main__":
     getStats2("10.0.0.10")

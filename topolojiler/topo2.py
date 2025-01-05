@@ -29,15 +29,25 @@ class NsfnetTopo(Topo):
 	def build(self, **params):
 	
 		h1=self.addHost('h1', ip='10.0.0.1')
+		h21=self.addHost('h21', ip='10.0.0.21')
 		h2=self.addHost('h2', ip='10.0.0.2')
+		h22=self.addHost('h22', ip='10.0.0.22')
 		h3=self.addHost('h3', ip='10.0.0.3')
+		h23=self.addHost('h23', ip='10.0.0.23')
 		h4=self.addHost('h4', ip='10.0.0.4')
+		h24=self.addHost('h24', ip='10.0.0.24')
 		h5=self.addHost('h5', ip='10.0.0.5')
+		h25=self.addHost('h25', ip='10.0.0.25')
 		h6=self.addHost('h6', ip='10.0.0.6')
+		h26=self.addHost('h26', ip='10.0.0.26')
 		h7=self.addHost('h7', ip='10.0.0.7')
+		h27=self.addHost('h27', ip='10.0.0.27')
 		h8=self.addHost('h8', ip='10.0.0.8')
+		h28=self.addHost('h28', ip='10.0.0.28')
 		h9=self.addHost('h9', ip='10.0.0.9')
+		h29=self.addHost('h29', ip='10.0.0.29')
 		h10=self.addHost('h10', ip='10.0.0.10')
+		h30=self.addHost('h30', ip='10.0.0.30')
 		h11=self.addHost('h11', ip='10.0.0.11')
 		h12=self.addHost('h12', ip='10.0.0.12')
 		h13=self.addHost('h13', ip='10.0.0.13')
@@ -58,6 +68,7 @@ class NsfnetTopo(Topo):
 		s12=self.addSwitch('s12',dpid='00:00:00:00:00:00:00:12',protocols="OpenFlow13")
 		s13=self.addSwitch('s13',dpid='00:00:00:00:00:00:00:13',protocols="OpenFlow13")
 		s14=self.addSwitch('s14',dpid='00:00:00:00:00:00:00:14',protocols="OpenFlow13")
+		
 		global bandWidth
 		bandWidth=10
 		linkOptns1=dict(delay='25ms',bw=bandWidth, loss=0, max_queue_size=1000, use_htb=True)
@@ -87,15 +98,25 @@ class NsfnetTopo(Topo):
 		self.addLink(s12, s13, **linkOptns2)
 	
 		self.addLink(s1, h1, **linkOptns1)
+		self.addLink(s1, h21, **linkOptns1)
 		self.addLink(s2, h2, **linkOptns1)
+		self.addLink(s2, h22, **linkOptns1)
 		self.addLink(s3, h3, **linkOptns1)
+		self.addLink(s3, h23, **linkOptns1)
 		self.addLink(s4, h4, **linkOptns1)
+		self.addLink(s4, h24, **linkOptns1)
 		self.addLink(s5, h5, **linkOptns1)
+		self.addLink(s5, h25, **linkOptns1)
 		self.addLink(s6, h6, **linkOptns1)
+		self.addLink(s6, h26, **linkOptns1)
 		self.addLink(s7, h7, **linkOptns1)
+		self.addLink(s7, h27, **linkOptns1)
 		self.addLink(s8, h8, **linkOptns1)
+		self.addLink(s8, h28, **linkOptns1)
 		self.addLink(s9, h9, **linkOptns1)
+		self.addLink(s9, h29, **linkOptns1)
 		self.addLink(s15, h10, **linkOptns1)
+		self.addLink(s15, h30, **linkOptns1)
 		self.addLink(s11, h11, **linkOptns1)
 		self.addLink(s12, h12, **linkOptns1)
 		self.addLink(s13, h13, **linkOptns1)
@@ -106,17 +127,11 @@ def startNetwork():
 	global net
 	global activeThreadList
 	global serverList
-	dosya="data16072024.csv"
+	dosya="data21.11.2024-topo2.csv"
 	global videoSource
 	videoSource="outputOrjinal.ts"
 	serverList={}
-	# serverList={"h1":"h10",
-			#  "h2":"h14",
-			#  "h3":"h10",
-			#  "h4":"h14",
-			#  "h5":"h10",
-			#  "h6":"h14",
-			#  }
+
 	activeThreadList=[]
 	net=None
 	global data
@@ -141,7 +156,9 @@ def startNetwork():
 	#net.pingAll()
 	
 	
-	hosts=["h1","h2","h3","h4","h5","h7","h8","h9","h11","h12","h13","h6"]
+	#hosts=["h1","h2","h3","h4","h5","h7","h8","h9","h11","h12","h13","h6"]
+	#hosts=["h1","h2","h3","h4","h5","h7","h8","h9","h11","h12","h13","h21","h22","h23","h6"]
+	hosts=["h25","h1","h2","h3","h4","h5","h7","h8","h9","h11","h12","h13","h21","h22","h23","h24","h6"]
 	# wireThread=HostCommand(net.getNodeByName("s4"),"wireshark")
 	# wireThread.daemon=True
 	# wireThread.start()
@@ -170,7 +187,17 @@ def startNetwork():
 		kayit=f"records/{host}/input.ts"
 		boyutana=os.stat(dosya_adi).st_size
 		boyutkayit=os.stat(kayit).st_size
-		dataRow={"host":host,"avgRTT":data[f'{host}avgRTT'],"packetLoss":data[f'{host}packetLoss'],"latency":data[f'{host}latency'],"hopCount":data[f'{host}hopCount'],"bandwidth":bandWidth*1000000,"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"kaynak":boyutana,"kayitboyut":boyutkayit,"kayip":(boyutana-boyutkayit),"kayip_orani":(((boyutana-boyutkayit)/boyutana)*100),"type":2,"server":serverList[host]}
+		if ssim_first>=0.99:
+			real_mos=5
+		elif ssim_first>=0.95 and ssim_first<0.99:
+			real_mos=4
+		elif ssim_first>=0.88 and ssim_first<0.95:
+			real_mos=3
+		elif ssim_first>=0.5 and ssim_first<0.88:
+			real_mos=2
+		elif ssim_first<0.5:
+			real_mos=1
+		dataRow={"host":host,"avgRTT":data[f'{host}avgRTT'],"packetLoss":data[f'{host}packetLoss'],"latency":data[f'{host}latency'],"hopCount":data[f'{host}hopCount'],"bandwidth":bandWidth*1000000,"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"kaynak":boyutana,"kayitboyut":boyutkayit,"kayip":(boyutana-boyutkayit),"kayip_orani":(((boyutana-boyutkayit)/boyutana)*100),"type":2,"server":serverList[host],"real_mos":real_mos}
 		#dataRow={"host":host,"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"kaynak":boyutana,"kayitboyut":boyutkayit,"kayip":(boyutana-boyutkayit),"kayip_orani":(((boyutana-boyutkayit)/boyutana)*100),"type":2,"server":serverList[host]}
 		dataFrame=dataFrame.append(dataRow,ignore_index=True)
 	

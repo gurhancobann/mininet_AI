@@ -1,0 +1,533 @@
+#!usr/bin/python
+
+import sys
+import pingparsing
+sys.path.append("../controller")
+from mininet.cli import CLI
+from mininet.log import setLogLevel, info
+from mininet.net import Mininet
+from mininet.node import RemoteController, OVSKernelSwitch, Host, CPULimitedHost
+from mininet.topo import Topo
+from mininet.link import TCLink
+from time import sleep, perf_counter
+import datetime
+import json
+from multiprocessing import Pool
+from concurrent.futures import ThreadPoolExecutor
+import threading
+from threading import Thread, Event
+import floodlightRestApi
+import subprocess
+import pandas as pd
+from nfstream import NFStreamer
+import os
+
+class NsfnetTopo(Topo):
+	"""
+	Topology link:
+	"""
+	def build(self, **params):
+	
+		h1=self.addHost('h1', ip='10.0.0.1')
+		h21=self.addHost('h21', ip='10.0.0.21')
+		h2=self.addHost('h2', ip='10.0.0.2')
+		h22=self.addHost('h22', ip='10.0.0.22')
+		h3=self.addHost('h3', ip='10.0.0.3')
+		h23=self.addHost('h23', ip='10.0.0.23')
+		h4=self.addHost('h4', ip='10.0.0.4')
+		h24=self.addHost('h24', ip='10.0.0.24')
+		h5=self.addHost('h5', ip='10.0.0.5')
+		h25=self.addHost('h25', ip='10.0.0.25')
+		h6=self.addHost('h6', ip='10.0.0.6')
+		h26=self.addHost('h26', ip='10.0.0.26')
+		h7=self.addHost('h7', ip='10.0.0.7')
+		h27=self.addHost('h27', ip='10.0.0.27')
+		h8=self.addHost('h8', ip='10.0.0.8')
+		h28=self.addHost('h28', ip='10.0.0.28')
+		h9=self.addHost('h9', ip='10.0.0.9')
+		h29=self.addHost('h29', ip='10.0.0.29')
+		h10=self.addHost('h10', ip='10.0.0.10')
+		h30=self.addHost('h30', ip='10.0.0.30')
+		h11=self.addHost('h11', ip='10.0.0.11')
+		h12=self.addHost('h12', ip='10.0.0.12')
+		h13=self.addHost('h13', ip='10.0.0.13')
+		h14=self.addHost('h14', ip='10.0.0.14')
+	
+		s1=self.addSwitch('s1',dpid='00:00:00:00:00:00:00:01',protocols="OpenFlow13")
+		s2=self.addSwitch('s2',dpid='00:00:00:00:00:00:00:02',protocols="OpenFlow13")
+		s3=self.addSwitch('s3',dpid='00:00:00:00:00:00:00:03',protocols="OpenFlow13")
+		s4=self.addSwitch('s4',dpid='00:00:00:00:00:00:00:04',protocols="OpenFlow13")
+		s5=self.addSwitch('s5',dpid='00:00:00:00:00:00:00:05',protocols="OpenFlow13")
+		s6=self.addSwitch('s6',dpid='00:00:00:00:00:00:00:06',protocols="OpenFlow13")
+		s7=self.addSwitch('s7',dpid='00:00:00:00:00:00:00:07',protocols="OpenFlow13")
+		s8=self.addSwitch('s8',dpid='00:00:00:00:00:00:00:08',protocols="OpenFlow13")
+		s9=self.addSwitch('s9',dpid='00:00:00:00:00:00:00:09',protocols="OpenFlow13")
+		s10=self.addSwitch('s10',dpid='00:00:00:00:00:00:00:10',protocols="OpenFlow13")
+		s15=self.addSwitch('s15',dpid='00:00:00:00:00:00:00:15',protocols="OpenFlow13")
+		s11=self.addSwitch('s11',dpid='00:00:00:00:00:00:00:11',protocols="OpenFlow13")
+		s12=self.addSwitch('s12',dpid='00:00:00:00:00:00:00:12',protocols="OpenFlow13")
+		s13=self.addSwitch('s13',dpid='00:00:00:00:00:00:00:13',protocols="OpenFlow13")
+		s14=self.addSwitch('s14',dpid='00:00:00:00:00:00:00:14',protocols="OpenFlow13")
+		
+		global bandWidth
+		bandWidth=10
+		linkOptns1=dict(delay='25ms',bw=bandWidth, loss=0, max_queue_size=1000, use_htb=True)
+		linkOptns2=dict(delay='25ms',bw=bandWidth, loss=0, max_queue_size=1000, use_htb=True)
+	
+		self.addLink(s1, s2, **linkOptns2)
+		self.addLink(s1, s3, **linkOptns2)
+		self.addLink(s1, s4, **linkOptns2)
+		self.addLink(s2, s8, **linkOptns2)
+		self.addLink(s2, s3, **linkOptns2)
+		self.addLink(s3, s6, **linkOptns2)
+		self.addLink(s4, s5, **linkOptns2)
+		self.addLink(s4, s9, **linkOptns2)
+		self.addLink(s5, s6, **linkOptns2)
+		self.addLink(s5, s7, **linkOptns2)
+		self.addLink(s6, s13, **linkOptns2)
+		self.addLink(s6, s14, **linkOptns2)
+		self.addLink(s7, s8, **linkOptns2)
+		self.addLink(s8, s11, **linkOptns2)
+		self.addLink(s9, s10, **linkOptns2)
+		self.addLink(s9, s12, **linkOptns2)
+		self.addLink(s10, s11, **linkOptns2)
+		self.addLink(s10, s13, **linkOptns2)
+		self.addLink(s10,s15, **linkOptns2)
+		self.addLink(s11, s12, **linkOptns2)
+		self.addLink(s11, s14, **linkOptns2)
+		self.addLink(s12, s13, **linkOptns2)
+	
+		self.addLink(s1, h1, **linkOptns1)
+		self.addLink(s1, h21, **linkOptns1)
+		self.addLink(s2, h2, **linkOptns1)
+		self.addLink(s2, h22, **linkOptns1)
+		self.addLink(s3, h3, **linkOptns1)
+		self.addLink(s3, h23, **linkOptns1)
+		self.addLink(s4, h4, **linkOptns1)
+		self.addLink(s4, h24, **linkOptns1)
+		self.addLink(s5, h5, **linkOptns1)
+		self.addLink(s5, h25, **linkOptns1)
+		self.addLink(s6, h6, **linkOptns1)
+		self.addLink(s6, h26, **linkOptns1)
+		self.addLink(s7, h7, **linkOptns1)
+		self.addLink(s7, h27, **linkOptns1)
+		self.addLink(s8, h8, **linkOptns1)
+		self.addLink(s8, h28, **linkOptns1)
+		self.addLink(s9, h9, **linkOptns1)
+		self.addLink(s9, h29, **linkOptns1)
+		self.addLink(s15, h10, **linkOptns1)
+		self.addLink(s15, h30, **linkOptns1)
+		self.addLink(s11, h11, **linkOptns1)
+		self.addLink(s12, h12, **linkOptns1)
+		self.addLink(s13, h13, **linkOptns1)
+		self.addLink(s14, h14, **linkOptns1)
+def startNetwork():
+	global net
+	global activeThreadList
+	global serverList
+	serverList={}
+	dosya="data21.11.2024.csv"
+	global videoSource
+	videoSource="outputOrjinal.ts"
+	activeThreadList=[]
+	net=None
+	global data
+	data={}
+	dataFrame=pd.read_csv(dosya)
+	dataRow={}
+	cleanMininet()
+
+	net=Mininet(topo=NsfnetTopo(),link=TCLink, build=False, switch=OVSKernelSwitch, autoSetMacs=True, waitConnected=True)
+	remote_ip="127.0.0.1"
+	
+	net.addController('c1', controller=RemoteController,ip=remote_ip,port=6653,protocols="OpenFlow13")
+	
+	info(f'[INFO]********Topoloji Oluşturuluyor********\n')
+	net.build()
+	info(f'[INFO]*************Ağ Başlatıldı************\n')
+	net.start()
+	info(f'[INFO]*************10 sn Bekleniyor************\n')
+	sleep(10)
+	net.pingAll()
+	floodlightRestApi.clearACL()
+	floodlightRestApi.deleteAllFlows()
+	info(f'[INFO]**********Tüm Akışlar Silindi**********\n')
+	servers=["h10","h14"]
+	#"h24","h25","h26","h27","h28","h29","h30",
+	hosts=["h7","h8","h9","h11","h12","h13","h21","h22","h23","h24","h25","h1","h2","h3","h4","h5","h6"]
+	info(f'[INFO]*********Test Yayını Başlatıldı********\n')
+	DenyAllACL(hosts,servers)
+	selectServer(hosts,servers)
+	print(json.dumps(serverList,indent=4))
+	#test(["h1","h2","h3","h4","h5"],serverList)
+	#print(json.dumps(serverList,indent=4))
+	# info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
+	# info(f'[INFO]********Testin Bitmesi Bekleniyor*******\n')
+	# sleep(16)
+	killFfmegPorts("h10")
+	killFfmegPorts("h14")
+	info(f'[INFO]********Test Bitti - Aktif thread sayısı : {threading.active_count()}*******\n')
+	info(f'[INFO]********ASıl İşlem *******\n')
+	sleep(10)
+	LoadBalacing(hosts,serverList)
+	sleep(10)
+	# activeThreadList=threading.enumerate()
+	# activeThreadList.pop(0)
+	killFfmegPorts("h10")
+	killFfmegPorts("h14")
+	print(activeThreadList)
+	#activeThreadList[len(activeThreadList)-1].join()
+	info(f'[INFO]********Video bitti*******\n')
+	info(f'[INFO]********PSNR & SSIM Değerleri Hesaplanıyor*******\n')
+	for host in hosts:
+		psnr, ssim_first, ssim_second=calcPsnrSsim(host)
+		dosya_adi=videoSource
+		kayit=f"records/{host}/input.ts"
+		boyutana=os.stat(dosya_adi).st_size
+		boyutkayit=os.stat(kayit).st_size
+		if ssim_first>=0.99:
+			real_mos=5
+		elif ssim_first>=0.95 and ssim_first<0.99:
+			real_mos=4
+		elif ssim_first>=0.88 and ssim_first<0.95:
+			real_mos=3
+		elif ssim_first>=0.5 and ssim_first<0.88:
+			real_mos=2
+		elif ssim_first<0.5:
+			real_mos=1
+		dataRow={"host":host,"avgRTT":data[f'{host}avgRTT'],"packetLoss":data[f'{host}packetLoss'],"latency":data[f'{host}latency'],"hopCount":data[f'{host}hopCount'],"bandwidth":bandWidth*1000000,"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"kaynak":boyutana,"kayitboyut":boyutkayit,"kayip":(boyutana-boyutkayit),"kayip_orani":(((boyutana-(boyutkayit-161196))/boyutana)*100),"h10gelen":data[f'{host}h10gelen'],"h10giden":data[f'{host}h10giden'],"h10toplam":data[f'{host}h10toplam'],"h14gelen":data[f'{host}h14gelen'],"h14giden":data[f'{host}h14giden'],"h14toplam":data[f'{host}h14toplam'],"type":6,"server":serverList[host],"tahmin_mos":data[f'{host}tahmin'],"real_mos":real_mos}
+		#dataRow={"host":host,"psnr":psnr,"ssim_first":ssim_first,"ssim_second":ssim_second,"kaynak":boyutana,"kayitboyut":boyutkayit,"kayip":(boyutana-boyutkayit),"kayip_orani":(((boyutana-boyutkayit)/boyutana)*100),"type":3,"server":serverList[host]}
+		dataFrame=dataFrame.append(dataRow,ignore_index=True)
+	
+	dataFrame.to_csv(dosya,sep=",",index=False,encoding="utf-8")
+	
+	try:
+		deletefile()
+	except Exception as e:
+		print(f"Excaption {e}")
+	
+	cleanMininet()
+	
+	info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
+	# wireThread.join()
+
+def selectServer(receivers,servers):
+	port="1234"
+	videoSourceTest="test.ts"
+	num_paths=3
+	path_index=0
+	senderCommand1=f"ffmpeg -re -t 15 -i {videoSourceTest}"
+	senderCommand2=f"ffmpeg -re -t 15 -i {videoSourceTest}"
+	hosts=[]
+	h10Toplam=0
+	h14Toplam=0
+	for receiver in receivers:
+		receiverNode=net.getNodeByName(receiver)
+		dst_host_ipv4=receiverNode.IP()
+		dst_host_mac=receiverNode.MAC()
+		hosts.append(receiver)
+		sleep(10)
+
+		if(len(serverList)==0):
+			print("serverList Boş")
+			sleep(3)
+			h10ftoplam,h14ftoplam,h10gelen,h10giden,h14gelen,h14giden,tahmin=testHostFloodlight(receiver,h10Toplam,h14Toplam)
+			if(serverList[receiver]=="h10"):
+				senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+			if(serverList[receiver]=="h14"):
+				senderCommand2=senderCommand2+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+		else:
+			print("serverList Boşdeğil")
+			floodlightRestApi.clearACL()
+			AllowACL(receivers,servers,serverList)
+			sleep(3)
+			for host in hosts:
+				print(host)
+				receiverURL=f"udp://{net.getNodeByName(host).IP()}:{port}"
+				receiverCommand=f"ffmpeg -timeout 5000 -i {receiverURL}"
+				receiverThread=(HostCommand(net.getNodeByName(host), receiverCommand))
+				receiverThread.daemon=True
+				receiverThread.start()
+			senderNode1=net.getNodeByName("h10")
+			senderNode2=net.getNodeByName("h14")
+			senderThread1=(HostCommand(senderNode1, senderCommand1))
+			senderThread1.daemon=True
+			senderThread1.start()
+			senderThread2=(HostCommand(senderNode2, senderCommand2))
+			senderThread2.daemon=True
+			senderThread2.start()
+			sleep(5)
+			h10ftoplam,h14ftoplam,h10gelen,h10giden,h14gelen,h14giden,tahmin=testHostFloodlight(receiver,h10Toplam,h14Toplam)
+			if(serverList[receiver]=="h10"):
+				senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+			if(serverList[receiver]=="h14"):
+				senderCommand2=senderCommand2+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+			sleep(35)
+			senderThread1.stop()
+			senderThread2.stop()
+			receiverThread.stop()
+			
+		num_paths=3
+		path_index=0
+		src_host_mac=net.getNodeByName(serverList[receiver]).MAC()
+		src_host_ipv4=net.getNodeByName(serverList[receiver]).IP()
+		data[f"{receiver}latency"],data[f"{receiver}hopCount"],data[f"{receiver}lowBandwidth"]=floodlightRestApi.pathPusher(src_host_mac, src_host_ipv4, dst_host_mac,dst_host_ipv4,num_paths,path_index)
+		sleep(3)
+		info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
+		info(f'[INFO]****** Ping Stats *****\n')
+		info(f'[INFO]********Aktif thread sayısı : {threading.active_count()}*******\n')
+		h10Toplam=h10Toplam+h10ftoplam
+		h14Toplam=h14Toplam+h14ftoplam
+		data[f'{receiver}h10gelen']=h10gelen
+		data[f'{receiver}h10giden']=h10giden
+		data[f'{receiver}h10toplam']=h10Toplam
+		data[f'{receiver}h14gelen']=h14gelen
+		data[f'{receiver}h14giden']=h14giden
+		data[f'{receiver}h14toplam']=h14Toplam
+		data[f'{receiver}tahmin']=tahmin
+		# killFfmegPorts("h10")
+		# killFfmegPorts("h14")
+	
+
+def LoadBalacing(receivers,serverList):
+	port="1234"
+	senderNode1, senderNode2=net.getNodeByName("h10"), net.getNodeByName("h14")
+	senderCommand1=f"ffmpeg -re -i {videoSource}"
+	senderCommand2=f"ffmpeg -re -i {videoSource}"
+	for receiver in receivers:
+		sleep(1)
+		receiverNode=net.getNodeByName(receiver)
+		dst_host_ipv4=receiverNode.IP()
+		if(serverList[receiver]=="h10"):
+			senderCommand1=senderCommand1+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+		if(serverList[receiver]=="h14"):
+			senderCommand2=senderCommand2+f" -c copy -f mpegts udp://{dst_host_ipv4}:{port}"
+		receiverURL=f"udp://{dst_host_ipv4}:{port}"
+		receiverNode.cmd(f"mkdir records/{receiver}")
+		receiverCommand=f"ffmpeg -i {receiverURL} -c copy records/{receiver}/input.ts"
+		receiverThread=(HostCommand(receiverNode, receiverCommand))
+		receiverThread.daemon=True
+		receiverThread.start()
+	
+	senderThread1=(HostCommand(senderNode1, senderCommand1))
+	senderThread1.daemon=True
+	senderThread1.start()
+	senderThread2=(HostCommand(senderNode2, senderCommand2))
+	senderThread2.daemon=True
+	senderThread2.start()
+	info(f'{datetime.datetime.now()} [INFO]********Video gönderim başladı*******\n')
+	for receiver in receivers:
+		print(receiver)
+		avgRTT, packetLoss = getPingStats(receiver, serverList[receiver])
+		data[f'{receiver}avgRTT'] = avgRTT
+		data[f'{receiver}packetLoss'] = packetLoss
+		print(f"""*** Average RTT: {avgRTT}\nPacket Loss: {packetLoss}""")
+		data[f'{receiver}avgRTT'] = avgRTT
+		data[f'{receiver}packetLoss'] = packetLoss
+	info(f'{datetime.datetime.now()}')
+	senderThread2.join()
+	info(f'[INFO]********Video gönderim bitti*******\n')
+
+
+def DenyAllACL(hosts,servers):
+    for host in hosts:
+        for server in servers:
+            floodlightRestApi.addACL(net.getNodeByName(host).IP(),net.getNodeByName(server).IP(),"deny")
+            print(host+"-->"+server+" deny")
+
+def AllowACL(hosts,servers,serverlist):
+	for host in hosts:
+		for server in servers:
+			if host in serverlist:
+				if(server==serverlist[host]):
+					floodlightRestApi.addACL(net.getNodeByName(host).IP(),net.getNodeByName(serverlist[host]).IP(),"allow")
+					print(host+"-->"+server+" allow")
+				else:
+					floodlightRestApi.addACL(net.getNodeByName(host).IP(),net.getNodeByName(server).IP(),"deny")
+					print(host+"-->"+server+" deny")
+
+def testHostFloodlight(receiver,h10,h14):
+	print(f"h10 önceki :{h10}, h14 önceki :{h14}")
+	print(f"testHost {receiver} için Başladı")
+	sleep(2)
+	
+	dst_host_mac=net.getNodeByName(receiver).MAC()
+	dst_host_ipv4=net.getNodeByName(receiver).IP()
+
+	num_paths=3
+	path_index=0
+    #h10 için
+	src_host_mac=net.getNodeByName("h10").MAC()
+	src_host_ipv4=net.getNodeByName("h10").IP()
+	h10_latency,h10_hopCount=floodlightRestApi.getPathInfo(src_host_mac, dst_host_mac)
+	sleep(3)
+	h10_avgRTT, h10_packetLoss = getPingStats(receiver, "h10")
+	h10_alinan_bytes,h10_iletilen_bytes,h10_sure=floodlightRestApi.getStats(net.getNodeByName("h10").IP())
+	
+	#h14
+	src_host_mac=net.getNodeByName("h14").MAC()
+	src_host_ipv4=net.getNodeByName("h14").IP()
+	h14_latency,h14_hopCount=floodlightRestApi.getPathInfo(src_host_mac, dst_host_mac)
+	sleep(3)
+	h14_avgRTT, h14_packetLoss = getPingStats(receiver, "h14")
+	h14_alinan_bytes,h14_iletilen_bytes,h14_sure=floodlightRestApi.getStats(net.getNodeByName("h14").IP())
+	print(net.getNodeByName("h10").IP())
+	print(net.getNodeByName("h14").IP())
+	h14_alinan_bytes,h14_iletilen_bytes,h14_sure=floodlightRestApi.getStats(net.getNodeByName("h14").IP())
+	print(f"h10 Alinan: {h10_alinan_bytes}, h10 İletilen : {h10_iletilen_bytes}")
+	print(f"h14 Alinan: {h14_alinan_bytes}, h14 İletilen : {h14_iletilen_bytes}")
+	print(f"h10 - >{h10_sure}  h14 - >{h14_sure}")
+	
+	if(len(serverList)==0):
+		tahmin=0
+		if(h10_sure==0):
+			serverList[receiver]="h10"
+		elif(h14_sure==0):
+			serverList[receiver]="h14"
+		else:
+			print(f"h10 toplam bytes: {h10_alinan_bytes+h10_iletilen_bytes} sure: {h10_sure}")
+			print(f"h14 toplam bytes: {h14_alinan_bytes+h14_iletilen_bytes} sure: {h14_sure}")
+			yuk1=(h10_alinan_bytes+h10_iletilen_bytes)/h10_sure
+			yuk2=(h14_alinan_bytes+h14_iletilen_bytes)/h14_sure
+			if (yuk1 < yuk2):
+				serverList[receiver]="h10"
+			else:
+				serverList[receiver]="h14"
+	else:
+		import pickle
+		with open("extraTreeRegressor9.pkl",'rb') as file:
+			model=pickle.load(file)
+		h10_x=pd.DataFrame({"avgRTT":[h10_avgRTT],"latency":[h10_latency],"hopCount":[h10_hopCount],"bandwidth":[10000000],"h10gelen":[h10_alinan_bytes],"h10giden":[h10_iletilen_bytes],"h10toplam":[h10_alinan_bytes+h10_iletilen_bytes],"h14gelen":[h14_alinan_bytes],"h14giden":[h14_iletilen_bytes],"h14toplam":[h14_alinan_bytes+h14_iletilen_bytes]})
+		print(h10_x)
+		h10_predict=model.predict(h10_x)
+
+		h14_x=pd.DataFrame({"avgRTT":[h14_avgRTT],"latency":[h14_latency],"hopCount":[h14_hopCount],"bandwidth":[10000000],"h10gelen":[h10_alinan_bytes],"h10giden":[h10_iletilen_bytes],"h10toplam":[h10_alinan_bytes+h10_iletilen_bytes],"h14gelen":[h14_alinan_bytes],"h14giden":[h14_iletilen_bytes],"h14toplam":[h14_alinan_bytes+h14_iletilen_bytes]})
+		h14_predict=model.predict(h14_x)
+
+		if(h10_predict>=h14_predict):
+			serverList[receiver]="h10"
+			tahmin=h10_predict
+		else:
+			serverList[receiver]="h14"
+			tahmin=h14_predict
+
+		print(f'h10 predict: {h10_predict}, h14 predict: {h14_predict}')
+	
+	print(f"{receiver}->{serverList[receiver]}")
+	return (h10_alinan_bytes+h10_iletilen_bytes),(h14_alinan_bytes+h14_iletilen_bytes),h10_alinan_bytes,h10_iletilen_bytes,h14_alinan_bytes,h14_iletilen_bytes,tahmin
+
+def getPingStats(receiver: str, sender: str) -> [float, float]:
+	senderNode, receiverNode = net.getNodeByName(sender), net.getNodeByName(receiver)
+	receiverIpv4 = receiverNode.IP()
+	print("Receiver ipv4 -> ", receiverIpv4)
+	packetCount = "9"
+	command = f"ping {receiverIpv4} -c {packetCount} -f"
+	result = senderNode.popen(command)
+	sonuclar, hata=result.communicate()
+	sonuc=sonuclar.decode('utf-8')
+	print(f"{datetime.datetime.now()} -> {sonuc}")
+	ping_parser = pingparsing.PingParsing()
+	sonuc = ping_parser.parse(sonuc).as_dict()
+	packetLoss = sonuc["packet_loss_rate"]
+	avgRTT = sonuc["rtt_avg"]
+	return avgRTT, packetLoss
+
+def netStatistic(sender:str, receiver:str, bandWidth):
+	server, client = net.getNodeByName(sender), net.getNodeByName(receiver)
+	port = "5555"
+	time=15
+	serverCommand = f"iperf3 -s -p {port} -i 1 -1"
+	clientCommand = f"iperf3 -c {server.IP()} -p {port} -b {bandWidth} -R -t {time} -J"
+	serverThread = HostCommand(server, serverCommand)
+	serverThread.daemon = True
+	clientThread = HostCommand(client, clientCommand) 
+	clientThread.daemon = True
+	sleep(1)
+	serverThread.start()
+	sleep(1) # time.sleep
+	clientThread.start()
+	serverThread.join()
+	clientThread.join()
+	print(json.dumps((clientThread.result),indent=4))
+	result = json.loads(clientThread.result)["end"]
+	return result
+
+def killFfmegPorts(senderNode):
+	node=net.getNodeByName(senderNode)
+	commandCheckPort="pgrep -x ffmpeg"
+	commandKillPort="pkill -x ffmpeg"
+	result=node.cmd(commandCheckPort)
+	while(result !=""):
+		node.cmd(commandKillPort)
+		print("port Killed: ",result)
+		result=node.cmd(commandCheckPort)
+
+def calcPsnrSsim(receiver):
+	host=net.getNodeByName(receiver)
+	print(f"***********{host} için PSNR ve SSİM değerleri hesaplanıyor******")
+	outputSource=f"records/{host}/input.ts"
+	command=f"ffmpeg -i {videoSource} -i {outputSource} -lavfi '[0:v][1:v]psnr' -f null -"
+	hostThread=HostCommand(host, command)
+	hostThread.daemon=True
+	hostThread.start()
+	hostThread.join()
+	psnrResault=hostThread.result
+	psnrResault=float(psnrResault.split("\n")[-2].split("average:")[1].split(" ")[0].strip())
+	command=f"ffmpeg -i {videoSource} -i {outputSource} -lavfi '[0:v][1:v]ssim' -f null -"
+	hostThread=HostCommand(host, command)
+	hostThread.daemon=True
+	hostThread.start()
+	hostThread.join()
+	ssimResault=hostThread.result.split("\n")[-2]
+	first=float(ssimResault.split("All:")[1].split(" ")[0])
+	second=float(ssimResault.split("All:")[1].split(" ")[1].replace("(","").replace(")",""))
+	print(f"***********PSNR:{psnrResault}, SSIM F:{first}, SSIM S:{second}******")
+	print("")
+	return psnrResault, first, second
+
+def cleanMininet():
+	script_path="cleanMininet.sh"
+	subprocess.run(['bash',script_path])
+
+def deletefile():
+	script_path="deleteFile.sh"
+	subprocess.run(['bash',script_path])
+
+class HostCommand(Thread):
+	def __init__(self, host:Host, command:str):
+		Thread.__init__(self)
+		self._host=host
+		self._command=command
+		self.result=None
+		self._stop_event=Event()
+	def run(self):
+		self.result=self._host.cmd(self._command)
+	def stop(self):
+		self._stop_event.is_set()
+
+class streamer(Thread):
+    def __init__(self, sources:str,ip:str):
+          Thread.__init__(self)
+          self._sources=sources
+          self._ip=ip
+          self.result=None
+    def run(self):
+        flow_streamer=NFStreamer(source=self._sources,
+                                statistical_analysis=True,
+                                active_timeout=5, idle_timeout=15,max_nflows=5
+                                #active_timeout 5 saniyelik süreyi ölçüyor
+                                )
+        totalPaket=0
+        zaman=0
+        
+        for flow in flow_streamer:
+            if((flow.src_ip==self._ip) or (flow.dst_ip==self._ip)) and (flow.application_name=="Unknown" and flow.application_category_name=="Unspecified"):
+                totalPaket=totalPaket+flow.bidirectional_packets
+                zaman=zaman+flow.bidirectional_duration_ms
+        self.result=[totalPaket,zaman]
+    
+
+
+if __name__ == '__main__':
+	setLogLevel('info')
+	startNetwork()	
